@@ -17,7 +17,6 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Mock authentication - in real app, use Supabase auth
     try {
       if (isSignUp) {
         const { data, error } = await supabase.auth.signUp({
@@ -38,7 +37,25 @@ const LoginPage: React.FC = () => {
           password,
         });
         
-        if (error) throw error;
+        if (error) {
+          // If login fails and it's the demo account, try to create it first
+          if (email === 'demo@nodeai.com' && password === 'demo123456' && error.message.includes('Invalid login credentials')) {
+            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+              email,
+              password,
+            });
+            
+            if (signUpError) throw signUpError;
+            
+            if (signUpData.user) {
+              setUser(signUpData.user);
+              toast.success('Demo account created! Welcome to NodeAI!');
+              navigate('/app');
+              return;
+            }
+          }
+          throw error;
+        }
         
         setUser(data.user);
         toast.success('Welcome back to NodeAI!');
