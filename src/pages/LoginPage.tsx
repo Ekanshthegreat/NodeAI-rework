@@ -61,7 +61,7 @@ const LoginPage: React.FC = () => {
         toast.success('Welcome back to NodeAI!');
         navigate('/app');
       }
-    } catch (error) {
+    } catch (error: any) {
       toast.error(error.message || (isSignUp ? 'Sign up failed' : 'Login failed'));
     } finally {
       setIsLoading(false);
