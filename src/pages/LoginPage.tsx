@@ -18,6 +18,7 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     // Mock authentication - in real app, use Supabase auth
+    try {
       if (isSignUp) {
         const { data, error } = await supabase.auth.signUp({
           email,
