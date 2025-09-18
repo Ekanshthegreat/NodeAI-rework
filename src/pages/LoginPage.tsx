@@ -112,6 +112,18 @@ const LoginPage: React.FC = () => {
                 : (isSignUp ? 'Create Account' : 'Sign In')
               }
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('demo@nodeai.com');
+                setPassword('demo123456');
+                setIsSignUp(false);
+              }}
+              className="w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium rounded-lg transition-colors duration-200 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+            >
+              Use Demo Account
+            </button>
           </form>
 
           <div className="mt-6 text-center">
@@ -126,7 +138,7 @@ const LoginPage: React.FC = () => {
               }
             </button>
             
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-gray-400 mt-2">
               Demo credentials: demo@nodeai.com / demo123456
             </p>
           </div>
