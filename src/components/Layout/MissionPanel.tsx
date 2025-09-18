@@ -32,54 +32,54 @@ const MissionPanel: React.FC = () => {
   };
 
   return (
-    <div className="p-4 flex flex-col min-h-0">
-      <div className="flex items-center justify-between mb-3">
+    <div className="p-3 flex flex-col min-h-0">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-2">
-          <Target className="w-5 h-5 text-orange-500" />
-          <h2 className="text-lg font-semibold text-white">
+          <Target className="w-4 h-4 text-orange-400" />
+          <h2 className="text-sm font-medium text-gray-300 uppercase tracking-wide">
             Missions ({siteMissions.length})
           </h2>
         </div>
         <button
           onClick={() => setShowDialog(true)}
-          className="p-1.5 bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors"
+          className="p-1 bg-orange-900/50 hover:bg-orange-800/50 rounded transition-colors border border-orange-700/50"
           title="New Mission"
         >
-          <Plus className="w-4 h-4 text-white" />
+          <Plus className="w-3 h-3 text-orange-300" />
         </button>
       </div>
       
-      <div className="space-y-2 flex-1 overflow-y-auto">
+      <div className="space-y-1 flex-1 overflow-y-auto">
         {siteMissions.map((mission) => (
           <button
             key={mission.id}
             onClick={() => setSelectedMission(mission.id === selectedMission ? null : mission.id)}
-            className={`w-full text-left p-3 rounded-lg transition-colors ${
+            className={`w-full text-left p-2 rounded transition-colors ${
               selectedMission === mission.id
-                ? 'bg-orange-600 text-white'
-                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                ? 'bg-orange-900/50 text-orange-300 border border-orange-700/50'
+                : 'bg-gray-800 hover:bg-gray-750 text-gray-400'
             }`}
           >
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1.5">
                 {getStatusIcon(mission.status)}
-                <span className="font-medium text-sm">Mission {mission.id.slice(0, 8)}</span>
+                <span className="font-medium text-xs font-mono">Mission {mission.id.slice(0, 8)}</span>
               </div>
-              <span className="text-xs opacity-75">
+              <span className="text-xs opacity-60">
                 {formatTime(mission.created_at)}
               </span>
             </div>
-            <div className="text-xs opacity-75 mt-1 line-clamp-2">
+            <div className="text-xs opacity-75 mt-0.5 line-clamp-2">
               {mission.nl}
             </div>
-            <div className="text-xs opacity-75 mt-1 capitalize">
+            <div className="text-xs opacity-60 mt-0.5 capitalize">
               Status: {mission.status}
             </div>
           </button>
         ))}
         
         {siteMissions.length === 0 && (
-          <div className="text-center text-gray-500 py-8 text-sm">
+          <div className="text-center text-gray-600 py-6 text-xs">
             No missions yet
           </div>
         )}

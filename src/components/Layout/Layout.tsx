@@ -16,16 +16,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Header />
       
       <div className="flex-1 flex overflow-hidden">
-        <div className={`transition-all duration-300 ${sidebarOpen ? 'w-80' : 'w-0'}`}>
+        <div className={`transition-all duration-300 ${sidebarOpen ? 'w-72' : 'w-0'}`}>
           <Sidebar />
         </div>
         
-        <div className="flex-1 flex flex-col p-4 space-y-4">
+        <div className="flex-1 flex flex-col p-3 space-y-3">
           <main className="flex-1">
             {children}
           </main>
           
-          <div className="h-64">
+          <div className="h-48">
             <EventLog />
           </div>
         </div>

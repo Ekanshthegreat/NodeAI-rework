@@ -25,46 +25,46 @@ const RobotPanel: React.FC = () => {
   };
 
   return (
-    <div className="p-4 border-b border-gray-700">
-      <div className="flex items-center space-x-2 mb-3">
-        <Bot className="w-5 h-5 text-teal-500" />
-        <h2 className="text-lg font-semibold text-white">
+    <div className="p-3 border-b border-gray-800">
+      <div className="flex items-center space-x-2 mb-2">
+        <Bot className="w-4 h-4 text-teal-400" />
+        <h2 className="text-sm font-medium text-gray-300 uppercase tracking-wide">
           Robots ({siteRobots.length})
         </h2>
       </div>
       
-      <div className="space-y-2 max-h-48 overflow-y-auto">
+      <div className="space-y-1 max-h-40 overflow-y-auto">
         {siteRobots.map((robot) => (
           <button
             key={robot.id}
             onClick={() => setSelectedRobot(robot.id === selectedRobot ? null : robot.id)}
-            className={`w-full text-left p-3 rounded-lg transition-colors ${
+            className={`w-full text-left p-2 rounded transition-colors ${
               selectedRobot === robot.id
-                ? 'bg-teal-600 text-white'
-                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                ? 'bg-teal-900/50 text-teal-300 border border-teal-700/50'
+                : 'bg-gray-800 hover:bg-gray-750 text-gray-400'
             }`}
           >
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Circle className={`w-3 h-3 ${getStatusColor(robot.status)} fill-current`} />
-                <span className="font-medium">{robot.id}</span>
+              <div className="flex items-center space-x-1.5">
+                <Circle className={`w-2 h-2 ${getStatusColor(robot.status)} fill-current`} />
+                <span className="text-sm font-medium font-mono">{robot.id}</span>
               </div>
-              <div className="flex items-center space-x-1">
-                <Battery className={`w-4 h-4 ${getBatteryColor(robot.battery)}`} />
-                <span className="text-xs">{Math.round(robot.battery * 100)}%</span>
+              <div className="flex items-center space-x-0.5">
+                <Battery className={`w-3 h-3 ${getBatteryColor(robot.battery)}`} />
+                <span className="text-xs font-mono">{Math.round(robot.battery * 100)}%</span>
               </div>
             </div>
-            <div className="text-xs opacity-75 mt-1">
+            <div className="text-xs opacity-60 mt-0.5">
               {robot.vendor} • {robot.status}
             </div>
-            <div className="text-xs opacity-75">
+            <div className="text-xs opacity-60 font-mono">
               ({robot.pose.x.toFixed(1)}, {robot.pose.y.toFixed(1)})
             </div>
           </button>
         ))}
         
         {siteRobots.length === 0 && (
-          <div className="text-center text-gray-500 py-8">
+          <div className="text-center text-gray-600 py-6 text-xs">
             No robots in this site
           </div>
         )}

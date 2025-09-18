@@ -5,7 +5,7 @@ import MissionPanel from './MissionPanel';
 
 const Sidebar: React.FC = () => {
   return (
-    <aside className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col h-full">
+    <aside className="w-72 bg-gray-900 border-r border-gray-800 flex flex-col h-full">
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex-1">
           <SitePanel />
