@@ -1,14 +1,32 @@
 import React from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAppStore } from './store/useAppStore';
+import { supabase } from './lib/supabase';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ReplayPage from './pages/ReplayPage';
 import Layout from './components/Layout/Layout';
 
 function App() {
-  const isAuthenticated = useAppStore((state) => state.isAuthenticated);
+  const { isAuthenticated, setUser } = useAppStore();
+
+  useEffect(() => {
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [setUser]);
 
   return (
     <Router>

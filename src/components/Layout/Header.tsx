@@ -3,16 +3,22 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Bot, Menu, LogOut, Play } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAppStore } from '../../store/useAppStore';
+import { supabase } from '../../lib/supabase';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, setUser, toggleSidebar, isRealtimeConnected } = useAppStore();
 
-  const handleLogout = () => {
-    setUser(null);
-    toast.success('Logged out successfully');
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      toast.success('Logged out successfully');
+      navigate('/login');
+    } catch (error) {
+      toast.error('Error logging out');
+    }
   };
 
   const isReplayPage = location.pathname === '/app/replay';

@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import type { User } from '@supabase/supabase-js';
 import type { Robot, Site, Mission, Event, TelemetryMessage } from '../types';
 
 interface AppStore {
   // Auth
-  user: unknown | null;
+  user: User | null;
   isAuthenticated: boolean;
   
   // Current selections
@@ -25,7 +26,7 @@ interface AppStore {
   sidebarOpen: boolean;
   
   // Actions
-  setUser: (user: unknown | null) => void;
+  setUser: (user: User | null) => void;
   setCurrentSite: (siteId: string | null) => void;
   setSelectedRobot: (robotId: string | null) => void;
   setSelectedMission: (missionId: string | null) => void;
