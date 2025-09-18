@@ -77,24 +77,3 @@ const Scene: React.FC = () => {
 };
 
 export default Scene;
-      
-      {/* Reference Objects */}
-      <mesh position={[0, 0.1, 0]}>
-        <boxGeometry args={[1, 0.2, 1]} />
-        <meshStandardMaterial color="#2d3748" />
-      </mesh>
-      
-      <mesh position={[5, 0.5, 5]}>
-        <cylinderGeometry args={[0.5, 0.5, 1]} />
-        <meshStandardMaterial color="#e53e3e" />
-      </mesh>
-      
-      <mesh position={[-5, 0.5, -5]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#3182ce" />
-      </mesh>
-    </group>
-  );
-};
-
-export default Scene;
