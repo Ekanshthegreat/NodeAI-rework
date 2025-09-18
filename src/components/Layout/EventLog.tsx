@@ -23,17 +23,17 @@ const EventLog: React.FC = () => {
   const recentTelemetry = telemetryBuffer.slice(-50).reverse();
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded flex flex-col h-full">
-      <div className="flex items-center space-x-2 p-3 border-b border-gray-800">
-        <ScrollText className="w-4 h-4 text-gray-500" />
-        <h3 className="text-sm font-medium text-gray-300 uppercase tracking-wide">Event Log</h3>
-        <span className="text-xs text-gray-500 font-mono">({recentTelemetry.length})</span>
+    <div className="bg-slate-950 border border-slate-800 rounded flex flex-col h-full">
+      <div className="flex items-center space-x-2 p-2 border-b border-slate-800">
+        <ScrollText className="w-3 h-3 text-slate-500" />
+        <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">EVENT LOG</h3>
+        <span className="text-xs text-slate-600 font-mono">({recentTelemetry.length})</span>
       </div>
       
       <div className="flex-1 overflow-y-auto p-3 space-y-1">
         {recentTelemetry.map((telemetry, index) => (
           <div key={`${telemetry.robot_id}-${telemetry.ts}-${index}`} className="flex items-center space-x-2 text-xs">
-            <span className="text-gray-600 font-mono text-xs">
+            <span className="text-slate-600 text-xs">
               {formatTime(telemetry.ts)}
             </span>
             
@@ -43,15 +43,15 @@ const EventLog: React.FC = () => {
               {telemetry.robot_id}
             </span>
             
-            <span className="text-gray-400 text-xs">
+            <span className="text-slate-400 text-xs">
               {telemetry.status}
             </span>
             
-            <span className="text-gray-500 font-mono text-xs">
+            <span className="text-slate-500 text-xs">
               ({telemetry.pose.x.toFixed(1)}, {telemetry.pose.y.toFixed(1)})
             </span>
             
-            <span className="text-gray-500 font-mono text-xs">
+            <span className="text-slate-500 text-xs">
               {Math.round(telemetry.battery * 100)}%
             </span>
             
@@ -65,7 +65,7 @@ const EventLog: React.FC = () => {
         
         {events.map((event) => (
           <div key={event.id} className="flex items-center space-x-2 text-xs">
-            <span className="text-gray-600 font-mono text-xs">
+            <span className="text-slate-600 text-xs">
               {new Date(event.ts).toLocaleTimeString()}
             </span>
             
@@ -75,14 +75,14 @@ const EventLog: React.FC = () => {
               {event.type}
             </span>
             
-            <span className="text-gray-400 font-mono text-xs">
+            <span className="text-slate-400 text-xs">
               Mission: {event.mission_id.slice(0, 8)}
             </span>
           </div>
         ))}
         
         {recentTelemetry.length === 0 && events.length === 0 && (
-          <div className="text-center text-gray-600 py-6 text-xs">
+          <div className="text-center text-slate-600 py-4 text-xs">
             No events yet. Start a mission to see real-time updates.
           </div>
         )}

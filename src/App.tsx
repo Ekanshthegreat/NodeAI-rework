@@ -30,7 +30,7 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-900 text-white">
+      <div className="min-h-screen bg-slate-950 text-white">
         <Routes>
           <Route 
             path="/login" 

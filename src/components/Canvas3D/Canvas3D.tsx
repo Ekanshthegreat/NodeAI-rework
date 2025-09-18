@@ -6,7 +6,7 @@ import LoadingSpinner from './LoadingSpinner';
 
 export const Canvas3D: React.FC = () => {
   return (
-    <div className="w-full h-full bg-gray-900 rounded-lg overflow-hidden relative">
+    <div className="w-full h-full bg-slate-950 rounded-lg overflow-hidden relative">
       <Canvas
         camera={{
           position: [10, 10, 10],
@@ -14,7 +14,7 @@ export const Canvas3D: React.FC = () => {
           near: 0.1,
           far: 1000,
         }}
-        className="bg-gray-900"
+        className="bg-slate-950"
         shadows
         gl={{ antialias: true, alpha: false }}
       >

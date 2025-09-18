@@ -25,10 +25,10 @@ const RobotPanel: React.FC = () => {
   };
 
   return (
-    <div className="p-3 border-b border-gray-800">
+    <div className="p-2 border-b border-slate-800">
       <div className="flex items-center space-x-2 mb-2">
         <Bot className="w-4 h-4 text-teal-400" />
-        <h2 className="text-sm font-medium text-gray-300 uppercase tracking-wide">
+        <h2 className="text-xs font-medium text-slate-400 uppercase tracking-wider">
           Robots ({siteRobots.length})
         </h2>
       </div>
@@ -41,7 +41,7 @@ const RobotPanel: React.FC = () => {
             className={`w-full text-left p-2 rounded transition-colors ${
               selectedRobot === robot.id
                 ? 'bg-teal-900/50 text-teal-300 border border-teal-700/50'
-                : 'bg-gray-800 hover:bg-gray-750 text-gray-400'
+                : 'bg-slate-800/50 hover:bg-slate-800 text-slate-400'
             }`}
           >
             <div className="flex items-center justify-between">
@@ -64,7 +64,7 @@ const RobotPanel: React.FC = () => {
         ))}
         
         {siteRobots.length === 0 && (
-          <div className="text-center text-gray-600 py-6 text-xs">
+          <div className="text-center text-slate-600 py-4 text-xs">
             No robots in this site
           </div>
         )}

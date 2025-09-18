@@ -12,7 +12,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const sidebarOpen = useAppStore((state) => state.sidebarOpen);
 
   return (
-    <div className="h-screen flex flex-col bg-gray-900">
+    <div className="h-screen flex flex-col bg-slate-950">
       <Header />
       
       <div className="flex-1 flex overflow-hidden">

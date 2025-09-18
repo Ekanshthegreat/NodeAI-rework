@@ -32,11 +32,11 @@ const MissionPanel: React.FC = () => {
   };
 
   return (
-    <div className="p-3 flex flex-col min-h-0">
+    <div className="p-2 flex flex-col min-h-0 border-b border-slate-800">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-2">
           <Target className="w-4 h-4 text-orange-400" />
-          <h2 className="text-sm font-medium text-gray-300 uppercase tracking-wide">
+          <h2 className="text-xs font-medium text-slate-400 uppercase tracking-wider">
             Missions ({siteMissions.length})
           </h2>
         </div>
@@ -57,7 +57,7 @@ const MissionPanel: React.FC = () => {
             className={`w-full text-left p-2 rounded transition-colors ${
               selectedMission === mission.id
                 ? 'bg-orange-900/50 text-orange-300 border border-orange-700/50'
-                : 'bg-gray-800 hover:bg-gray-750 text-gray-400'
+                : 'bg-slate-800/50 hover:bg-slate-800 text-slate-400'
             }`}
           >
             <div className="flex items-center justify-between">
@@ -79,7 +79,7 @@ const MissionPanel: React.FC = () => {
         ))}
         
         {siteMissions.length === 0 && (
-          <div className="text-center text-gray-600 py-6 text-xs">
+          <div className="text-center text-slate-600 py-4 text-xs">
             No missions yet
           </div>
         )}

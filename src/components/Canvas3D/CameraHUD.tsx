@@ -32,16 +32,16 @@ const CameraHUD: React.FC = () => {
         zIndex: 1000,
       }}
     >
-      <div className="bg-gray-900/90 text-gray-300 text-xs font-mono p-2 rounded border border-gray-700 backdrop-blur-sm">
+      <div className="bg-slate-950/90 text-slate-300 text-xs font-mono p-2 rounded border border-slate-700 backdrop-blur-sm">
         <div className="space-y-1">
           <div className="flex justify-between items-center">
-            <span className="text-gray-500">FPS:</span>
+            <span className="text-slate-500">FPS:</span>
             <span className={`font-bold ${fps < 30 ? 'text-red-400' : fps < 50 ? 'text-yellow-400' : 'text-green-400'}`}>
               {fps}
             </span>
           </div>
-          <div className="border-t border-gray-700 pt-1">
-            <div className="text-gray-500 text-xs mb-1">Position:</div>
+          <div className="border-t border-slate-700 pt-1">
+            <div className="text-slate-500 text-xs mb-1">Position:</div>
             <div className="grid grid-cols-3 gap-1 text-xs">
               <div>
                 <span className="text-red-400">X:</span>
