@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('demo@nodeai.com');
-  const [password, setPassword] = useState('demo123456');
+  const [password, setPassword] = useState('password');
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const navigate = useNavigate();
@@ -117,7 +117,7 @@ const LoginPage: React.FC = () => {
               type="button"
               onClick={() => {
                 setEmail('demo@nodeai.com');
-                setPassword('demo123456');
+                setPassword('password');
                 setIsSignUp(false);
               }}
               className="w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium rounded-lg transition-colors duration-200 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
@@ -139,7 +139,7 @@ const LoginPage: React.FC = () => {
             </button>
             
             <p className="text-sm text-gray-400 mt-2">
-              Demo credentials: demo@nodeai.com / demo123456
+              Demo credentials: demo@nodeai.com / password
             </p>
           </div>
         </div>
