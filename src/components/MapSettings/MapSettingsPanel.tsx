@@ -22,7 +22,7 @@ const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({ isOpen, onClose }) 
   
   const { currentSite, sites, setSites } = useAppStore();
   const {
-    calibrationPoints,
+    calibrationPoints: rawCalibrationPoints,
     calibrationDistance,
     origin,
     isCalibrating,
@@ -31,6 +31,8 @@ const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({ isOpen, onClose }) 
     setIsCalibrating,
     resetCalibration,
   } = useSceneStore();
+
+  const calibrationPoints = rawCalibrationPoints ?? [];
 
   const currentSiteData = sites.find(site => site.id === currentSite);
 

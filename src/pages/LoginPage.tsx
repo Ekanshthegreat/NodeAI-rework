@@ -59,11 +59,18 @@ const LoginPage: React.FC = () => {
             }
           }
           throw error;
+        options: {
+          emailRedirectTo: undefined,
+        },
         }
        
        // Handle email not confirmed error for demo accounts
-       if (error.message?.includes('Email not confirmed')) {
-         toast.error('Demo account email needs confirmation. Please check your Supabase settings to disable email confirmation for development.');
+        if (error.message.includes('Email not confirmed')) {
+          toast.error('Please disable email confirmation in Supabase settings for development');
+        } else {
+          console.error('Demo account creation failed:', error);
+          toast.error('Failed to create demo account');
+        }
          return;
        }
         
