@@ -1,8 +1,9 @@
 import React, { useRef, useMemo } from 'react';
-import { useLoader } from '@react-three/fiber';
-import { TextureLoader } from 'three';
+import { useLoader, useFrame } from '@react-three/fiber';
+import { TextureLoader, RepeatWrapping } from 'three';
 import * as THREE from 'three';
 import type { Site } from '../../types';
+import { useAppStore } from '../../store/useAppStore';
 
 interface MapLayerProps {
   site: Site;
@@ -11,6 +12,10 @@ interface MapLayerProps {
 
 const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   const meshRef = useRef<THREE.Mesh>(null);
+  const { sites } = useAppStore();
+  
+  // Get the latest site data from the store
+  const currentSiteData = sites.find(s => s.id === site.id) || site;
   
   // Load the map texture with error handling
   const texture = useMemo(() => {
@@ -46,20 +51,27 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
         ctx.fillStyle = '#666';
         ctx.font = '24px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(site.name, 256, 256);
+        ctx.fillText(currentSiteData.name, 256, 256);
       }
       
       const fallbackTexture = new THREE.CanvasTexture(canvas);
       
       // Try to load the actual texture, fall back to generated one
       const actualTexture = loader.load(
-        site.map_url,
+        currentSiteData.map_url,
         undefined, // onLoad
         undefined, // onProgress
         (error) => {
-          console.warn(`Failed to load map texture: ${site.map_url}`, error);
+          console.warn(`Failed to load map texture: ${currentSiteData.map_url}`, error);
         }
       );
+      
+      // Configure texture
+      if (actualTexture) {
+        actualTexture.wrapS = RepeatWrapping;
+        actualTexture.wrapT = RepeatWrapping;
+        actualTexture.flipY = false;
+      }
       
       return actualTexture || fallbackTexture;
     } catch (error) {
@@ -75,7 +87,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
       }
       return new THREE.CanvasTexture(canvas);
     }
-  }, [site.map_url, site.name]);
+  }, [currentSiteData.map_url, currentSiteData.name]);
   
   // Calculate plane dimensions based on scale
   const planeDimensions = useMemo(() => {
@@ -84,16 +96,16 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
     const mapHeight = 1024;
     
     // Convert pixels to meters using the site's scale
-    const worldWidth = mapWidth * site.scale_m_per_px;
-    const worldHeight = mapHeight * site.scale_m_per_px;
+    const worldWidth = mapWidth * currentSiteData.scale_m_per_px;
+    const worldHeight = mapHeight * currentSiteData.scale_m_per_px;
     
     return [worldWidth, worldHeight];
-  }, [site.scale_m_per_px]);
+  }, [currentSiteData.scale_m_per_px]);
   
   if (!visible) return null;
   
   return (
-    <group position={[site.origin.x, 0, site.origin.y]}>
+    <group position={[currentSiteData.origin.x, 0, currentSiteData.origin.y]}>
       <mesh
         ref={meshRef}
         rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane

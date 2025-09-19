@@ -132,6 +132,36 @@ export const useSceneStore = create<SceneStore>()(
       
       clearOverlays: () =>
         set({ overlays: [] }, false, 'clearOverlays'),
+      
+      // Calibration actions
+      setCalibrationPoints: (points) =>
+        set({ calibrationPoints: points }, false, 'setCalibrationPoints'),
+      
+      addCalibrationPoint: (point) =>
+        set(
+          (state) => ({
+            calibrationPoints: [...state.calibrationPoints, point]
+          }),
+          false,
+          'addCalibrationPoint'
+        ),
+      
+      setCalibrationDistance: (distance) =>
+        set({ calibrationDistance: distance }, false, 'setCalibrationDistance'),
+      
+      setOrigin: (origin) =>
+        set({ origin }, false, 'setOrigin'),
+      
+      setIsCalibrating: (calibrating) =>
+        set({ isCalibrating: calibrating }, false, 'setIsCalibrating'),
+      
+      resetCalibration: () =>
+        set({
+          calibrationPoints: [],
+          calibrationDistance: null,
+          origin: null,
+          isCalibrating: false,
+        }, false, 'resetCalibration'),
     }),
     { name: 'scene-store' }
   )
