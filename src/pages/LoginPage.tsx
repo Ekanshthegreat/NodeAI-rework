@@ -80,7 +80,7 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  return (
+  const handleDemoLogin = async () => {
     setIsLoading(true);
     try {
       const demoEmail = 'exchawla@gmail.com';
@@ -89,6 +89,9 @@ const LoginPage: React.FC = () => {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: demoEmail,
         password: demoPassword,
+        options: {
+          emailRedirectTo: undefined,
+        }
       });
       
       if (error) {
@@ -122,6 +125,16 @@ const LoginPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="bg-slate-900 rounded-lg shadow-xl p-8 border border-slate-800">
+          <div className="text-center mb-8">
+            <img 
+              src="/nodeai-logo.svg" 
+              alt="NodeAI" 
+              className="w-16 h-16 mx-auto mb-4"
+            />
+            <h1 className="text-2xl font-bold text-white mb-2">NodeAI</h1>
             <p className="text-slate-400">
               {isSignUp ? 'Create your account' : 'Robot Mission Orchestration'}
             </p>
