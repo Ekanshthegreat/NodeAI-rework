@@ -81,14 +81,47 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      <div className="max-w-md w-full mx-4">
-        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 shadow-2xl">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-800 rounded-full mb-4 border border-slate-600">
-              <img src="/nodeai-logo.svg" alt="NodeAI" className="w-8 h-8" />
-            </div>
-            <h1 className="text-3xl font-bold text-white mb-2">NodeAI</h1>
+    setIsLoading(true);
+    try {
+      const demoEmail = 'exchawla@gmail.com';
+      const demoPassword = 'demo123';
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: demoEmail,
+        password: demoPassword,
+      });
+      
+      if (error) {
+        // Try to create demo account if it doesn't exist
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: demoEmail,
+          password: demoPassword,
+          options: {
+            emailRedirectTo: undefined,
+          }
+        });
+        
+        if (signUpError) throw signUpError;
+        
+        if (signUpData.user) {
+          setUser(signUpData.user);
+          toast.success('Demo account created! Welcome to NodeAI!');
+          navigate('/app');
+          return;
+        }
+      }
+      
+      if (data.user) {
+        setUser(data.user);
+        toast.success('Welcome back to NodeAI!');
+        navigate('/app');
+      }
+    } catch (error: any) {
+      console.error('Demo login failed:', error);
+      toast.error('Demo login failed');
+    } finally {
+      setIsLoading(false);
+    }
             <p className="text-slate-400">
               {isSignUp ? 'Create your account' : 'Robot Mission Orchestration'}
             </p>
@@ -144,14 +177,11 @@ const LoginPage: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => {
-                setEmail('exchawla@gmail.com');
-                setPassword('demo123');
-                setIsSignUp(false);
-              }}
+              onClick={handleDemoLogin}
+              disabled={isLoading}
               className="w-full py-2 px-4 bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium rounded-lg transition-colors duration-200 focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-800"
             >
-              Use Demo Account
+              {isLoading ? 'Logging in...' : 'Use Demo Account'}
             </button>
           </form>
 
