@@ -44,9 +44,9 @@ const LoginPage: React.FC = () => {
             const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
               email,
               password,
-             options: {
-               emailRedirectTo: undefined, // Disable email confirmation
-             }
+              options: {
+                emailRedirectTo: undefined, // Disable email confirmation
+              }
             });
             
             if (signUpError) throw signUpError;
@@ -59,27 +59,22 @@ const LoginPage: React.FC = () => {
             }
           }
           throw error;
-        options: {
-          emailRedirectTo: undefined,
-        },
         }
-       
-       // Handle email not confirmed error for demo accounts
-        if (error.message.includes('Email not confirmed')) {
-          toast.error('Please disable email confirmation in Supabase settings for development');
-        } else {
-          console.error('Demo account creation failed:', error);
-          toast.error('Failed to create demo account');
-        }
-         return;
-       }
         
-        setUser(data.user);
-        toast.success('Welcome back to NodeAI!');
-        navigate('/app');
+        if (data.user) {
+          setUser(data.user);
+          toast.success('Welcome back to NodeAI!');
+          navigate('/app');
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || (isSignUp ? 'Sign up failed' : 'Login failed'));
+      // Handle email not confirmed error for demo accounts
+      if (error.message.includes('Email not confirmed')) {
+        toast.error('Please disable email confirmation in Supabase settings for development');
+      } else {
+        console.error('Demo account creation failed:', error);
+        toast.error(error.message || (isSignUp ? 'Sign up failed' : 'Login failed'));
+      }
     } finally {
       setIsLoading(false);
     }
