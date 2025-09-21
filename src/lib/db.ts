@@ -175,18 +175,6 @@ export async function seedIfEmpty(): Promise<void> {
         status: 'ACTIVE',
       },
     ]);
-        battery: 0.9,
-        status: 'IDLE',
-      },
-      {
-        id: 'R2',
-        site_id: 'demo_site',
-        vendor: 'mock',
-        pose: { x: 2, y: 0, theta: 0 },
-        battery: 0.9,
-        status: 'IDLE',
-      },
-    ]);
 
   if (robotsError) {
     throw new Error(`Failed to seed robots: ${robotsError.message}`);
@@ -213,12 +201,11 @@ export async function seedIfEmpty(): Promise<void> {
       },
     ])
     .select();
-  if (robotsError) {
-    throw new Error(`Failed to seed robots: ${robotsError.message}`);
+
   if (missionsError) {
     throw new Error(`Failed to seed missions: ${missionsError.message}`);
   }
-  }
+
   console.log('Database seeded successfully:', {
     sites: 1,
     robots: 3,
