@@ -7,36 +7,36 @@ import LoadingSpinner from './LoadingSpinner';
 export const Canvas3D: React.FC = () => {
   return (
     <div className="w-full h-full bg-slate-950 rounded-xl overflow-hidden relative shadow-2xl border border-slate-800/50">
-      <Canvas
-        camera={{
-          position: [10, 10, 10],
-          fov: 50,
-          near: 0.1,
-          far: 1000,
-        }}
-        className="bg-gradient-to-br from-slate-950 to-slate-900"
-        shadows
-        gl={{ antialias: true, alpha: false }}
-      >
-        <Suspense fallback={<LoadingSpinner />}>
+      <Suspense fallback={<LoadingSpinner />}>
+        <Canvas
+          camera={{
+            position: [10, 10, 10],
+            fov: 50,
+            near: 0.1,
+            far: 1000,
+          }}
+          className="bg-gradient-to-br from-slate-950 to-slate-900"
+          shadows
+          gl={{ antialias: true, alpha: false }}
+          onCreated={({ gl }) => {
+            gl.setClearColor('#0f172a', 1);
+          }}
+        >
           {/* Lighting */}
-          <ambientLight intensity={0.3} />
+          <ambientLight intensity={0.4} />
           <directionalLight 
             position={[10, 10, 10]} 
-            intensity={1} 
+            intensity={0.8} 
             castShadow
-            shadow-mapSize-width={2048}
-            shadow-mapSize-height={2048}
+            shadow-mapSize-width={1024}
+            shadow-mapSize-height={1024}
             shadow-camera-far={50}
             shadow-camera-left={-20}
             shadow-camera-right={20}
             shadow-camera-top={20}
             shadow-camera-bottom={-20}
           />
-          <pointLight position={[-10, -10, -10]} intensity={0.5} />
-          
-          {/* Environment */}
-          <Environment preset="warehouse" background={false} />
+          <pointLight position={[-10, -10, -10]} intensity={0.3} />
           
           {/* Grid */}
           <Grid
@@ -65,17 +65,17 @@ export const Canvas3D: React.FC = () => {
             enableRotate={true}
             minDistance={2}
             maxDistance={100}
-            maxPolarAngle={Math.PI / 2.1} // Prevent going below ground
+            maxPolarAngle={Math.PI / 2.1}
             enableDamping={true}
             dampingFactor={0.05}
           />
           
           {/* Performance Stats (development only) */}
-          {process.env.NODE_ENV === 'development' && (
+          {import.meta.env.DEV && (
             <Stats showPanel={0} className="stats" />
           )}
-        </Suspense>
-      </Canvas>
+        </Canvas>
+      </Suspense>
     </div>
   );
 };

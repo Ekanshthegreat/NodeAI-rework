@@ -129,15 +129,17 @@ export async function seedIfEmpty(): Promise<void> {
     return; // Already seeded
   }
 
+  console.log('Seeding database with initial data...');
+
   // Insert demo site
   const { error: siteError } = await supabase
     .from('sites')
     .insert({
-      id: 'demo_site',
-      name: 'Demo Hospital',
-      map_url: null,
+      id: 'HospitalA-F2',
+      name: 'Hospital Alpha - Floor 2',
+      map_url: '/maps/hospital-f2.png',
       origin: { x: 0, y: 0 },
-      scale_m_per_px: 0.02,
+      scale_m_per_px: 0.05,
     });
 
   if (siteError) {
@@ -149,10 +151,30 @@ export async function seedIfEmpty(): Promise<void> {
     .from('robots')
     .insert([
       {
-        id: 'R1',
-        site_id: 'demo_site',
+        id: 'MED-001',
+        site_id: 'HospitalA-F2',
+        vendor: 'rmf',
+        pose: { x: 2.5, y: 1.0, theta: 0.0 },
+        battery: 0.85,
+        status: 'IDLE',
+      },
+      {
+        id: 'MED-002',
+        site_id: 'HospitalA-F2',
+        vendor: 'vda5050',
+        pose: { x: -1.5, y: 3.2, theta: 1.57 },
+        battery: 0.42,
+        status: 'CHARGING',
+      },
+      {
+        id: 'MED-003',
+        site_id: 'HospitalA-F2',
         vendor: 'mock',
-        pose: { x: 0, y: 0, theta: 0 },
+        pose: { x: 4.0, y: -2.1, theta: -0.78 },
+        battery: 0.67,
+        status: 'ACTIVE',
+      },
+    ]);
         battery: 0.9,
         status: 'IDLE',
       },
@@ -169,4 +191,37 @@ export async function seedIfEmpty(): Promise<void> {
   if (robotsError) {
     throw new Error(`Failed to seed robots: ${robotsError.message}`);
   }
+
+  // Insert sample missions
+  const { data: missions, error: missionsError } = await supabase
+    .from('missions')
+    .insert([
+      {
+        site_id: 'HospitalA-F2',
+        nl: 'Deliver medication from pharmacy to room 205',
+        status: 'active',
+      },
+      {
+        site_id: 'HospitalA-F2',
+        nl: 'Transport lab samples from room 210 to laboratory',
+        status: 'completed',
+      },
+      {
+        site_id: 'HospitalA-F2',
+        nl: 'Perform security patrol of all patient rooms',
+        status: 'planning',
+      },
+    ])
+    .select();
+  if (robotsError) {
+    throw new Error(`Failed to seed robots: ${robotsError.message}`);
+  if (missionsError) {
+    throw new Error(`Failed to seed missions: ${missionsError.message}`);
+  }
+  }
+  console.log('Database seeded successfully:', {
+    sites: 1,
+    robots: 3,
+    missions: missions?.length || 0
+  });
 }

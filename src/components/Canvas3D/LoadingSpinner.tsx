@@ -1,14 +1,16 @@
 import React from 'react';
-import { Html } from '@react-three/drei';
 
 const LoadingSpinner: React.FC = () => {
   return (
-    <Html center>
-      <div className="flex items-center space-x-2 text-gray-400">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
-        <span className="text-sm font-mono">Initializing...</span>
+    <div className="absolute inset-0 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm">
+      <div className="flex flex-col items-center space-y-4 text-slate-400">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-400 border-t-transparent"></div>
+        <div className="text-center">
+          <div className="text-sm font-medium text-slate-300">Loading 3D Scene</div>
+          <div className="text-xs text-slate-500 mt-1">Initializing Three.js...</div>
+        </div>
       </div>
-    </Html>
+    </div>
   );
 };
 

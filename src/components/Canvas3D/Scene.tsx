@@ -6,7 +6,6 @@ import MapLayer from './MapLayer';
 import PathRenderer from './PathRenderer';
 import OverlayRenderer from './OverlayRenderer';
 import SceneAxes from './SceneAxes';
-import CameraHUD from './CameraHUD';
 
 const Scene: React.FC = () => {
   const { robots, currentSite, sites } = useAppStore();
@@ -28,9 +27,6 @@ const Scene: React.FC = () => {
 
   return (
     <>
-      {/* Camera HUD */}
-      <CameraHUD />
-      
       <group>
         {/* Scene Axes */}
         <SceneAxes />

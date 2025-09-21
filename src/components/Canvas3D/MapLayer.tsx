@@ -20,8 +20,6 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   // Load the map texture with error handling
   const texture = useMemo(() => {
     try {
-      // Create a fallback texture if the image fails to load
-      const loader = new TextureLoader();
       const canvas = document.createElement('canvas');
       canvas.width = 512;
       canvas.height = 512;
@@ -29,9 +27,9 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
       
       if (ctx) {
         // Create a simple grid pattern as fallback
-        ctx.fillStyle = '#f0f0f0';
+        ctx.fillStyle = '#1e293b';
         ctx.fillRect(0, 0, 512, 512);
-        ctx.strokeStyle = '#ccc';
+        ctx.strokeStyle = '#475569';
         ctx.lineWidth = 1;
         
         // Draw grid lines
@@ -48,7 +46,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
         }
         
         // Add site name
-        ctx.fillStyle = '#666';
+        ctx.fillStyle = '#94a3b8';
         ctx.font = '24px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(currentSiteData.name, 256, 256);
@@ -56,24 +54,9 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
       
       const fallbackTexture = new THREE.CanvasTexture(canvas);
       
-      // Try to load the actual texture, fall back to generated one
-      const actualTexture = loader.load(
-        currentSiteData.map_url,
-        undefined, // onLoad
-        undefined, // onProgress
-        (error) => {
-          console.warn(`Failed to load map texture: ${currentSiteData.map_url}`, error);
-        }
-      );
-      
-      // Configure texture
-      if (actualTexture) {
-        actualTexture.wrapS = RepeatWrapping;
-        actualTexture.wrapT = RepeatWrapping;
-        actualTexture.flipY = false;
-      }
-      
-      return actualTexture || fallbackTexture;
+      // For now, just use the fallback texture
+      // TODO: Load actual map images when available
+      return fallbackTexture;
     } catch (error) {
       console.warn('Error creating map texture:', error);
       // Return a basic colored texture as last resort
@@ -82,7 +65,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
       canvas.height = 256;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.fillStyle = '#e2e8f0';
+        ctx.fillStyle = '#1e293b';
         ctx.fillRect(0, 0, 256, 256);
       }
       return new THREE.CanvasTexture(canvas);
