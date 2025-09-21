@@ -3,16 +3,48 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing Supabase environment variables. Please check your .env file.'
-  );
-}
+// Create a mock client if env vars are missing
+const createMockClient = () => ({
+  auth: {
+    getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    signInWithPassword: () => Promise.resolve({ data: { user: { id: 'mock', email: 'demo@nodeai.com' } }, error: null }),
+    signUp: () => Promise.resolve({ data: { user: { id: 'mock', email: 'demo@nodeai.com' } }, error: null }),
+    signOut: () => Promise.resolve({ error: null }),
+  },
+  from: () => ({
+    select: () => ({ data: [], error: null }),
+    insert: () => ({ data: [], error: null }),
+    upsert: () => ({ data: [], error: null }),
+    eq: () => ({ data: [], error: null }),
+    order: () => ({ data: [], error: null }),
+    limit: () => ({ data: [], error: null }),
+    single: () => ({ data: null, error: null }),
+  }),
+  storage: {
+    from: () => ({
+      upload: () => Promise.resolve({ data: null, error: null }),
+      getPublicUrl: () => ({ data: { publicUrl: '' } }),
+    }),
+  },
+});
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  realtime: {
-    params: {
-      eventsPerSecond: 10,
+export const supabase = (!supabaseUrl || !supabaseAnonKey) 
+  ? createMockClient() as any
+  : createClient(supabaseUrl, supabaseAnonKey, {
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
+    });
+
+// Check if we're using mock client
+export const isUsingMockClient = !supabaseUrl || !supabaseAnonKey;
+
+if (isUsingMockClient) {
+  console.warn('Using mock Supabase client - set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for real data');
+}
     },
   },
 });

@@ -27,8 +27,12 @@ const DashboardPage: React.FC = () => {
       try {
         setIsLoading(true);
         
-        // Ensure seed data exists
-        await seedIfEmpty();
+        // Try to ensure seed data exists (will fallback to mock if Supabase unavailable)
+        try {
+          await seedIfEmpty();
+        } catch (error) {
+          console.warn('Seeding failed, using mock data:', error);
+        }
         
         // Load data from Supabase
         const [sites, robots, missions] = await Promise.all([
@@ -94,7 +98,7 @@ const DashboardPage: React.FC = () => {
         
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
-        toast.error('Failed to load dashboard data');
+        toast.error('Using mock data - Supabase connection failed');
         pushEvent({
           ts: Date.now(),
           level: 'ERROR',

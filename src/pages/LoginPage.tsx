@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { Bot, Lock, Mail } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { supabase } from '../lib/supabase';
+import { supabase, isUsingMockClient } from '../lib/supabase';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('exchawla@gmail.com');
@@ -18,6 +18,21 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // If using mock client, just set user and navigate
+      if (isUsingMockClient) {
+        const mockUser = { 
+          id: 'mock-user', 
+          email: email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          email_confirmed_at: new Date().toISOString(),
+        };
+        setUser(mockUser as any);
+        toast.success('Welcome to NodeAI (Demo Mode)!');
+        navigate('/app');
+        return;
+      }
+
       if (isSignUp) {
         const { data, error } = await supabase.auth.signUp({
           email,
