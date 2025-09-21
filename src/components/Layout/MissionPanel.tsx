@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Target, Plus, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { usePolicyStore } from '../../store/usePolicyStore';
 import MissionDialog from '../Mission/MissionDialog';
 
 const MissionPanel: React.FC = () => {
   const { missions, currentSite, selectedMission, setSelectedMission } = useAppStore();
+  const { getReplanCount } = usePolicyStore();
   const [showDialog, setShowDialog] = useState(false);
 
   const siteMissions = missions.filter((mission) => mission.site_id === currentSite);
@@ -75,6 +77,11 @@ const MissionPanel: React.FC = () => {
             <div className="text-xs opacity-60 mt-0.5 capitalize">
               Status: {mission.status}
             </div>
+            {getReplanCount(mission.id) > 0 && (
+              <div className="text-xs text-blue-400 mt-0.5">
+                Replanned {getReplanCount(mission.id)}x
+              </div>
+            )}
           </button>
         ))}
         

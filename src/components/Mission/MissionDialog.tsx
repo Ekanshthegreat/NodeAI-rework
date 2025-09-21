@@ -3,7 +3,11 @@ import { Dialog } from '@headlessui/react';
 import { X, Send } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAppStore } from '../../store/useAppStore';
+import { usePolicyStore } from '../../store/usePolicyStore';
 import { generateMissionId } from '../../utils/generators';
+import { compileNLToPlan } from '../../lib/planner';
+import { saveMissionPlan } from '../../lib/db';
+import { supabase } from '../../lib/supabase';
 
 interface MissionDialogProps {
   isOpen: boolean;
@@ -15,7 +19,8 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
   const [priority, setPriority] = useState<'low' | 'normal' | 'high'>('normal');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { currentSite, missions, setMissions } = useAppStore();
+  const { currentSite, missions, setMissions, robots, addEvent } = useAppStore();
+  const { setMissionPlan } = usePolicyStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,23 +29,62 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
     setIsSubmitting(true);
     
     try {
-      // Mock mission creation - in real app, call LLM endpoint
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const missionId = generateMissionId();
       
+      // Compile NL to mission plan
+      const siteRobots = robots.filter(r => r.site_id === currentSite);
+      const plan = compileNLToPlan(naturalLanguage.trim(), currentSite, siteRobots, {
+        defaultMinBattery: 0.2,
+        defaultPolicy: { reassign_on_blocked_s: 10, retry_limit: 1 },
+      });
+      
+      // Save to database
+      const { data: mission, error: missionError } = await supabase
+        .from('missions')
+        .insert({
+          id: missionId,
+          site_id: currentSite,
+          nl: naturalLanguage.trim(),
+          status: 'planning',
+        })
+        .select()
+        .single();
+      
+      if (missionError) throw missionError;
+      
+      // Save mission plan
+      await saveMissionPlan(missionId, plan);
+      
+      // Store in policy store
+      setMissionPlan(missionId, plan);
+      
+      // Update local state
       const newMission = {
-        id: generateMissionId(),
+        id: missionId,
         site_id: currentSite,
         nl: naturalLanguage.trim(),
         status: 'planning',
         created_at: new Date().toISOString(),
       };
-
+      
       setMissions([...missions, newMission]);
+      
+      // Add event
+      addEvent({
+        id: `event-${Date.now()}`,
+        mission_id: missionId,
+        robot_id: plan.robot_selection.include[0] || null,
+        type: 'mission_event',
+        payload: { action: 'created', priority },
+        ts: new Date().toISOString(),
+      });
+      
       toast.success('Mission created successfully!');
       
       setNaturalLanguage('');
       onClose();
     } catch (error) {
+      console.error('Mission creation failed:', error);
       toast.error('Failed to create mission');
     } finally {
       setIsSubmitting(false);

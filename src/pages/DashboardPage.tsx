@@ -2,11 +2,16 @@ import React, { useEffect } from 'react';
 import { Canvas3D } from '../components/Canvas3D/Canvas3D';
 import { useAppStore } from '../store/useAppStore';
 import { useSceneStore } from '../store/useSceneStore';
+import DevPanel from '../components/DevPanel';
 import { generateMockData } from '../utils/mockData';
+import { usePolicyEngine } from '../hooks/usePolicyEngine';
 
 const DashboardPage: React.FC = () => {
   const { currentSite, setCurrentSite, setSites, setRobots, setMissions } = useAppStore();
   const { addPath, addOverlay, clearPaths, clearOverlays } = useSceneStore();
+
+  // Initialize policy engine
+  usePolicyEngine();
 
   useEffect(() => {
     // Load initial mock data
@@ -63,6 +68,7 @@ const DashboardPage: React.FC = () => {
       <div className="flex-1 bg-gray-900 rounded-lg overflow-hidden relative">
         <Canvas3D />
       </div>
+      <DevPanel />
     </div>
   );
 };

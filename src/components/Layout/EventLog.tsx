@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollText, Circle } from 'lucide-react';
+import { ScrollText, Circle, GitBranch } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 
 const EventLog: React.FC = () => {
@@ -69,15 +69,29 @@ const EventLog: React.FC = () => {
               {new Date(event.ts).toLocaleTimeString()}
             </span>
             
-            <Circle className="w-1.5 h-1.5 text-purple-400 fill-current" />
+            {event.type === 'replan_event' ? (
+              <GitBranch className="w-1.5 h-1.5 text-orange-400" />
+            ) : (
+              <Circle className="w-1.5 h-1.5 text-purple-400 fill-current" />
+            )}
             
-            <span className="text-purple-400 text-xs">
+            <span className={`text-xs ${
+              event.type === 'replan_event' ? 'text-orange-400' : 'text-purple-400'
+            }`}>
               {event.type}
             </span>
             
-            <span className="text-slate-400 text-xs">
-              Mission: {event.mission_id.slice(0, 8)}
-            </span>
+            {event.mission_id && (
+              <span className="text-slate-400 text-xs">
+                Mission: {event.mission_id.slice(0, 8)}
+              </span>
+            )}
+            
+            {event.payload?.reason && (
+              <span className="text-yellow-400 text-xs">
+                Reason: {event.payload.reason}
+              </span>
+            )}
           </div>
         ))}
         
