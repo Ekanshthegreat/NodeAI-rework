@@ -4,7 +4,6 @@ import { useAppStore } from '../store/useAppStore';
 import { useSceneStore } from '../store/useSceneStore';
 import DevPanel from '../components/DevPanel';
 import { useTelemetry } from '../hooks/useTelemetry';
-import { fetchSites, fetchRobots, fetchMissions, seedIfEmpty } from '../lib/db';
 import { toast } from 'react-hot-toast';
 
 const DashboardPage: React.FC = () => {
@@ -27,27 +26,82 @@ const DashboardPage: React.FC = () => {
       try {
         setIsLoading(true);
         
-        // Try to ensure seed data exists (will fallback to mock if Supabase unavailable)
-        try {
-          await seedIfEmpty();
-        } catch (error) {
-          console.warn('Seeding failed, using mock data:', error);
-        }
+        // Use mock hospital data directly
+        const mockSites = [
+          {
+            id: 'HospitalA-F2',
+            name: 'Hospital Alpha - Floor 2',
+            map_url: '/maps/hospital-f2.png',
+            origin: { x: 0, y: 0 },
+            scale_m_per_px: 0.05,
+            created_at: new Date().toISOString(),
+          }
+        ];
+
+        const mockRobots = [
+          {
+            id: 'MED-001',
+            site_id: 'HospitalA-F2',
+            vendor: 'rmf',
+            pose: { x: 2.5, y: 1.0, theta: 0.0 },
+            battery: 0.85,
+            status: 'IDLE',
+            capabilities: ['delivery', 'dock'],
+            updated_at: new Date().toISOString(),
+          },
+          {
+            id: 'MED-002',
+            site_id: 'HospitalA-F2',
+            vendor: 'vda5050',
+            pose: { x: -1.5, y: 3.2, theta: 1.57 },
+            battery: 0.42,
+            status: 'CHARGING',
+            capabilities: ['delivery', 'dock'],
+            updated_at: new Date().toISOString(),
+          },
+          {
+            id: 'MED-003',
+            site_id: 'HospitalA-F2',
+            vendor: 'mock',
+            pose: { x: 4.0, y: -2.1, theta: -0.78 },
+            battery: 0.67,
+            status: 'ACTIVE',
+            capabilities: ['delivery', 'dock', 'elevator'],
+            updated_at: new Date().toISOString(),
+          },
+        ];
+
+        const mockMissions = [
+          {
+            id: 'mission-001',
+            site_id: 'HospitalA-F2',
+            nl: 'Deliver medication from pharmacy to room 205',
+            status: 'active',
+            created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+          },
+          {
+            id: 'mission-002',
+            site_id: 'HospitalA-F2',
+            nl: 'Transport lab samples from room 210 to laboratory',
+            status: 'completed',
+            created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+          },
+          {
+            id: 'mission-003',
+            site_id: 'HospitalA-F2',
+            nl: 'Perform security patrol of all patient rooms',
+            status: 'planning',
+            created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+          },
+        ];
         
-        // Load data from Supabase
-        const [sites, robots, missions] = await Promise.all([
-          fetchSites(),
-          fetchRobots(),
-          fetchMissions()
-        ]);
-        
-        setSites(sites);
-        setRobots(robots);
-        setMissions(missions);
+        setSites(mockSites);
+        setRobots(mockRobots);
+        setMissions(mockMissions);
         
         // Set default site
-        if (!currentSite && sites.length > 0) {
-          setCurrentSite(sites[0].id);
+        if (!currentSite && mockSites.length > 0) {
+          setCurrentSite(mockSites[0].id);
         }
         
         // Add demo paths and overlays
@@ -55,20 +109,18 @@ const DashboardPage: React.FC = () => {
         clearOverlays();
         
         // Demo path for first robot
-        if (robots.length > 0) {
-          addPath({
-            id: 'demo-path-1',
-            robotId: robots[0].id,
-            points: [
-              { x: 0, y: 0 },
-              { x: 2, y: 3 },
-              { x: 5, y: 5 },
-              { x: 3, y: 8 }
-            ],
-            color: '#10b981',
-            visible: true,
-          });
-        }
+        addPath({
+          id: 'demo-path-1',
+          robotId: mockRobots[0].id,
+          points: [
+            { x: 0, y: 0 },
+            { x: 2, y: 3 },
+            { x: 5, y: 5 },
+            { x: 3, y: 8 }
+          ],
+          color: '#10b981',
+          visible: true,
+        });
         
         // Demo overlays
         addOverlay({
@@ -92,13 +144,15 @@ const DashboardPage: React.FC = () => {
         pushEvent({
           ts: Date.now(),
           level: 'INFO',
-          msg: `Dashboard loaded: ${sites.length} sites, ${robots.length} robots, ${missions.length} missions`,
-          payload: { sites: sites.length, robots: robots.length, missions: missions.length }
+          msg: `Dashboard loaded: ${mockSites.length} sites, ${mockRobots.length} robots, ${mockMissions.length} missions`,
+          payload: { sites: mockSites.length, robots: mockRobots.length, missions: mockMissions.length }
         });
+
+        toast.success('Hospital demo data loaded successfully');
         
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
-        toast.error('Using mock data - Supabase connection failed');
+        toast.error('Failed to load dashboard data');
         pushEvent({
           ts: Date.now(),
           level: 'ERROR',

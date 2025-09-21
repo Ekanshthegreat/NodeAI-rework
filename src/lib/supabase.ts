@@ -54,6 +54,10 @@ export const upsertSite = async (site: {
   origin?: { x: number; y: number };
   scale_m_per_px?: number;
 }) => {
+  if (isUsingMockClient) {
+    return { ...site, created_at: new Date().toISOString() };
+  }
+  
   const { data, error } = await supabase
     .from('sites')
     .upsert(site, { onConflict: 'id' })
@@ -65,6 +69,10 @@ export const upsertSite = async (site: {
 };
 
 export const uploadMapImage = async (file: File, siteId: string): Promise<string> => {
+  if (isUsingMockClient) {
+    return '/maps/mock-hospital.png';
+  }
+  
   const fileExt = file.name.split('.').pop();
   const fileName = `${siteId}-${Date.now()}.${fileExt}`;
   

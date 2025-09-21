@@ -1,13 +1,24 @@
 import React, { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid, Environment, Stats } from '@react-three/drei';
+import { OrbitControls, Grid } from '@react-three/drei';
 import Scene from './Scene';
-import LoadingSpinner from './LoadingSpinner';
+
+const LoadingFallback = () => (
+  <div className="absolute inset-0 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm">
+    <div className="flex flex-col items-center space-y-4 text-slate-400">
+      <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-400 border-t-transparent"></div>
+      <div className="text-center">
+        <div className="text-sm font-medium text-slate-300">Loading 3D Scene</div>
+        <div className="text-xs text-slate-500 mt-1">Initializing Three.js...</div>
+      </div>
+    </div>
+  </div>
+);
 
 export const Canvas3D: React.FC = () => {
   return (
     <div className="w-full h-full bg-slate-950 rounded-xl overflow-hidden relative shadow-2xl border border-slate-800/50">
-      <Suspense fallback={<LoadingSpinner />}>
+      <Suspense fallback={<LoadingFallback />}>
         <Canvas
           camera={{
             position: [10, 10, 10],
@@ -16,27 +27,14 @@ export const Canvas3D: React.FC = () => {
             far: 1000,
           }}
           className="bg-gradient-to-br from-slate-950 to-slate-900"
-          shadows
           gl={{ antialias: true, alpha: false }}
           onCreated={({ gl }) => {
             gl.setClearColor('#0f172a', 1);
           }}
         >
-          {/* Lighting */}
-          <ambientLight intensity={0.4} />
-          <directionalLight 
-            position={[10, 10, 10]} 
-            intensity={0.8} 
-            castShadow
-            shadow-mapSize-width={1024}
-            shadow-mapSize-height={1024}
-            shadow-camera-far={50}
-            shadow-camera-left={-20}
-            shadow-camera-right={20}
-            shadow-camera-top={20}
-            shadow-camera-bottom={-20}
-          />
-          <pointLight position={[-10, -10, -10]} intensity={0.3} />
+          {/* Simple Lighting */}
+          <ambientLight intensity={0.6} />
+          <directionalLight position={[10, 10, 10]} intensity={0.8} />
           
           {/* Grid */}
           <Grid
@@ -69,11 +67,6 @@ export const Canvas3D: React.FC = () => {
             enableDamping={true}
             dampingFactor={0.05}
           />
-          
-          {/* Performance Stats (development only) */}
-          {import.meta.env.DEV && (
-            <Stats showPanel={0} className="stats" />
-          )}
         </Canvas>
       </Suspense>
     </div>
