@@ -1,7 +1,24 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type { User } from '@supabase/supabase-js';
-import type { Robot, Site, Mission, Event, TelemetryMessage } from '../types';
+import type { Robot, Site, Mission, Event, TelemetryMessage, MissionPlan } from '../types';
+
+interface KPI {
+  replans_count: number;
+  interventions_avoided: number;
+  mttr_ms_avg: number;
+}
+
+interface PolicyConfig {
+  selfHealEnabled: boolean;
+  defaultMinBatteryPct: number;
+  defaultBlockedSeconds: number;
+}
+
+interface FaultInjection {
+  blockedUntil?: number;
+  drained?: boolean;
+}
 
 interface AppStore {
   // Auth
@@ -19,6 +36,12 @@ interface AppStore {
   missions: Mission[];
   events: Event[];
   telemetryBuffer: TelemetryMessage[];
+  
+  // Policy & KPI
+  kpi: KPI;
+  policy: PolicyConfig;
+  faultInjected: Record<string, FaultInjection>;
+  missionPlans: Record<string, MissionPlan>;
   
   // UI State
   isRealtimeConnected: boolean;
@@ -39,6 +62,13 @@ interface AppStore {
   setTelemetryEnabled: (enabled: boolean) => void;
   toggleSidebar: () => void;
   clearTelemetryBuffer: () => void;
+  
+  // Policy & KPI Actions
+  setMissionPlan: (mission_id: string, plan: MissionPlan) => void;
+  setPolicy: (p: Partial<PolicyConfig>) => void;
+  bumpKPI: (delta: Partial<KPI>) => void;
+  setFault: (robotId: string, patch: FaultInjection) => void;
+  pushEvent: (event: { ts: number; level: 'INFO' | 'WARN' | 'ERROR'; msg: string; payload?: Record<string, unknown> }) => void;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -58,6 +88,20 @@ export const useAppStore = create<AppStore>()(
       isRealtimeConnected: false,
       telemetryEnabled: true,
       sidebarOpen: true,
+      
+      // Policy & KPI initial state
+      kpi: {
+        replans_count: 0,
+        interventions_avoided: 0,
+        mttr_ms_avg: 0,
+      },
+      policy: {
+        selfHealEnabled: true,
+        defaultMinBatteryPct: 0.2,
+        defaultBlockedSeconds: 10,
+      },
+      faultInjected: {},
+      missionPlans: {},
 
       // Actions
       setUser: (user) =>
@@ -108,6 +152,55 @@ export const useAppStore = create<AppStore>()(
       
       clearTelemetryBuffer: () =>
         set({ telemetryBuffer: [] }, false, 'clearTelemetryBuffer'),
+      
+      // Policy & KPI Actions
+      setMissionPlan: (mission_id, plan) =>
+        set(
+          (state) => ({
+            missionPlans: { ...state.missionPlans, [mission_id]: plan }
+          }),
+          false,
+          'setMissionPlan'
+        ),
+      
+      setPolicy: (p) =>
+        set(
+          (state) => ({ policy: { ...state.policy, ...p } }),
+          false,
+          'setPolicy'
+        ),
+      
+      bumpKPI: (delta) =>
+        set(
+          (state) => ({ kpi: { ...state.kpi, ...delta } }),
+          false,
+          'bumpKPI'
+        ),
+      
+      setFault: (robotId, patch) =>
+        set(
+          (state) => ({
+            faultInjected: { ...state.faultInjected, [robotId]: patch }
+          }),
+          false,
+          'setFault'
+        ),
+      
+      pushEvent: (event) =>
+        set(
+          (state) => ({
+            events: [...state.events.slice(-99), {
+              id: `event-${Date.now()}`,
+              mission_id: null,
+              robot_id: null,
+              type: 'system',
+              payload: event.payload || {},
+              ts: new Date(event.ts).toISOString(),
+            }]
+          }),
+          false,
+          'pushEvent'
+        ),
     }),
     { name: 'nodeai-store' }
   )

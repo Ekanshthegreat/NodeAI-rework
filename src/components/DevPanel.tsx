@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
-import { Settings, Zap, Battery, Square, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Settings, Zap, Battery, Square, RotateCcw, AlertTriangle, Shield, ShieldOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAppStore } from '../store/useAppStore';
-import { usePolicyStore } from '../store/usePolicyStore';
 
 const DevPanel: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const { selectedRobot, robots, setRobots, addEvent } = useAppStore();
   const { 
-    selfHealingEnabled, 
-    setSelfHealingEnabled, 
-    injectFault, 
-    clearFault,
-    getFault 
-  } = usePolicyStore();
+    selectedRobot, 
+    robots, 
+    policy, 
+    setPolicy, 
+    faultInjected, 
+    setFault, 
+    pushEvent 
+  } = useAppStore();
 
   // Only show in development with feature flag
   if (import.meta.env.VITE_SHOW_DEV_PANEL !== 'true') {
@@ -21,7 +21,7 @@ const DevPanel: React.FC = () => {
   }
 
   const selectedRobotData = robots.find(r => r.id === selectedRobot);
-  const hasFault = selectedRobot ? getFault(selectedRobot) : null;
+  const hasFault = selectedRobot ? faultInjected[selectedRobot] : null;
 
   const handleInjectBlocked = () => {
     if (!selectedRobot) {
@@ -29,35 +29,17 @@ const DevPanel: React.FC = () => {
       return;
     }
 
-    injectFault(selectedRobot, 'BLOCKED', 10000); // 10 seconds
-    
-    // Update robot status
-    setRobots(robots.map(robot => 
-      robot.id === selectedRobot 
-        ? { ...robot, status: 'BLOCKED' }
-        : robot
-    ));
+    const now = Date.now();
+    setFault(selectedRobot, { blockedUntil: now + 10000 }); // 10 seconds
 
-    addEvent({
-      id: `event-${Date.now()}`,
-      mission_id: null,
-      robot_id: selectedRobot,
-      type: 'system',
-      payload: { action: 'fault_injected', fault_type: 'BLOCKED', duration: 10 },
-      ts: new Date().toISOString(),
+    pushEvent({
+      ts: now,
+      level: 'WARN',
+      msg: `Fault injected: BLOCKED on ${selectedRobot} for 10s`,
+      payload: { action: 'fault_injected', fault_type: 'BLOCKED', robot_id: selectedRobot, duration: 10 },
     });
 
     toast.success(`Injected BLOCKED fault on ${selectedRobot} for 10s`);
-
-    // Auto-clear after duration
-    setTimeout(() => {
-      clearFault(selectedRobot);
-      setRobots(robots.map(robot => 
-        robot.id === selectedRobot 
-          ? { ...robot, status: 'IDLE' }
-          : robot
-      ));
-    }, 10000);
   };
 
   const handleDrainBattery = () => {
@@ -66,45 +48,25 @@ const DevPanel: React.FC = () => {
       return;
     }
 
-    injectFault(selectedRobot, 'LOW_BATTERY', 30000); // 30 seconds
-    
-    // Update robot battery
-    setRobots(robots.map(robot => 
-      robot.id === selectedRobot 
-        ? { ...robot, battery: 0.15 }
-        : robot
-    ));
+    const now = Date.now();
+    setFault(selectedRobot, { drained: true });
 
-    addEvent({
-      id: `event-${Date.now()}`,
-      mission_id: null,
-      robot_id: selectedRobot,
-      type: 'system',
-      payload: { action: 'fault_injected', fault_type: 'LOW_BATTERY', battery: 0.15 },
-      ts: new Date().toISOString(),
+    pushEvent({
+      ts: now,
+      level: 'WARN',
+      msg: `Fault injected: LOW_BATTERY on ${selectedRobot} (15%)`,
+      payload: { action: 'fault_injected', fault_type: 'LOW_BATTERY', robot_id: selectedRobot, battery: 0.15 },
     });
 
     toast.success(`Drained battery on ${selectedRobot} to 15%`);
-
-    // Auto-restore after duration
-    setTimeout(() => {
-      clearFault(selectedRobot);
-      setRobots(robots.map(robot => 
-        robot.id === selectedRobot 
-          ? { ...robot, battery: 0.9 }
-          : robot
-      ));
-    }, 30000);
   };
 
   const handleEmitTestEvent = () => {
-    addEvent({
-      id: `event-${Date.now()}`,
-      mission_id: null,
-      robot_id: null,
-      type: 'system',
+    pushEvent({
+      ts: Date.now(),
+      level: 'INFO',
+      msg: 'Test event emitted from Dev Panel',
       payload: { action: 'test_event' },
-      ts: new Date().toISOString(),
     });
     toast.success('Test event emitted');
   };
@@ -114,13 +76,11 @@ const DevPanel: React.FC = () => {
       // This would clear and reseed data in a real implementation
       toast.success('Data reset (mock)');
       
-      addEvent({
-        id: `event-${Date.now()}`,
-        mission_id: null,
-        robot_id: null,
-        type: 'system',
+      pushEvent({
+        ts: Date.now(),
+        level: 'INFO',
+        msg: 'Data reset completed',
         payload: { action: 'data_reset' },
-        ts: new Date().toISOString(),
       });
     } catch (error) {
       toast.error('Failed to reset data');
@@ -155,16 +115,23 @@ const DevPanel: React.FC = () => {
             <div className="space-y-4">
               {/* Self-healing toggle */}
               <div className="flex items-center justify-between">
-                <span className="text-slate-300">Self-Healing</span>
+                <div className="flex items-center space-x-2">
+                  {policy.selfHealEnabled ? (
+                    <Shield className="w-4 h-4 text-green-400" />
+                  ) : (
+                    <ShieldOff className="w-4 h-4 text-red-400" />
+                  )}
+                  <span className="text-slate-300">Self-Healing</span>
+                </div>
                 <button
-                  onClick={() => setSelfHealingEnabled(!selfHealingEnabled)}
+                  onClick={() => setPolicy({ selfHealEnabled: !policy.selfHealEnabled })}
                   className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                    selfHealingEnabled
+                    policy.selfHealEnabled
                       ? 'bg-green-600 hover:bg-green-700 text-white'
                       : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                   }`}
                 >
-                  {selfHealingEnabled ? 'ON' : 'OFF'}
+                  {policy.selfHealEnabled ? 'ON' : 'OFF'}
                 </button>
               </div>
 
@@ -182,7 +149,7 @@ const DevPanel: React.FC = () => {
                 {hasFault && (
                   <div className="text-orange-400 text-sm mt-1 flex items-center">
                     <AlertTriangle className="w-3 h-3 mr-1" />
-                    Fault: {hasFault.type}
+                    Fault: {hasFault.blockedUntil ? 'BLOCKED' : hasFault.drained ? 'LOW_BATTERY' : 'None'}
                   </div>
                 )}
               </div>
@@ -193,7 +160,7 @@ const DevPanel: React.FC = () => {
                 
                 <button
                   onClick={handleInjectBlocked}
-                  disabled={!selectedRobot || hasFault?.type === 'BLOCKED'}
+                  disabled={!selectedRobot || !!hasFault?.blockedUntil}
                   className="w-full flex items-center justify-center space-x-2 py-2 px-4 bg-red-600 hover:bg-red-700 disabled:bg-red-500 disabled:opacity-50 text-white rounded transition-colors"
                 >
                   <Square className="w-4 h-4" />
@@ -202,11 +169,11 @@ const DevPanel: React.FC = () => {
 
                 <button
                   onClick={handleDrainBattery}
-                  disabled={!selectedRobot || hasFault?.type === 'LOW_BATTERY'}
+                  disabled={!selectedRobot || !!hasFault?.drained}
                   className="w-full flex items-center justify-center space-x-2 py-2 px-4 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-500 disabled:opacity-50 text-white rounded transition-colors"
                 >
                   <Battery className="w-4 h-4" />
-                  <span>Drain Battery to 15%</span>
+                  <span>Drain Battery (15%)</span>
                 </button>
               </div>
 
@@ -229,6 +196,41 @@ const DevPanel: React.FC = () => {
                   <RotateCcw className="w-4 h-4" />
                   <span>Reset Seed Data</span>
                 </button>
+              </div>
+              
+              {/* Policy Configuration */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-slate-300">Policy Settings</h3>
+                
+                <div className="space-y-2">
+                  <label className="block text-xs text-slate-400">
+                    Min Battery Threshold: {Math.round(policy.defaultMinBatteryPct * 100)}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="0.5"
+                    step="0.05"
+                    value={policy.defaultMinBatteryPct}
+                    onChange={(e) => setPolicy({ defaultMinBatteryPct: parseFloat(e.target.value) })}
+                    className="w-full"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="block text-xs text-slate-400">
+                    Blocked Timeout: {policy.defaultBlockedSeconds}s
+                  </label>
+                  <input
+                    type="range"
+                    min="5"
+                    max="30"
+                    step="5"
+                    value={policy.defaultBlockedSeconds}
+                    onChange={(e) => setPolicy({ defaultBlockedSeconds: parseInt(e.target.value) })}
+                    className="w-full"
+                  />
+                </div>
               </div>
             </div>
           </div>

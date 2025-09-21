@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import { Target, Plus, Clock, CheckCircle, AlertCircle, Play, Pause, RotateCcw } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import { usePolicyStore } from '../../store/usePolicyStore';
 import MissionDialog from '../Mission/MissionDialog';
 
 const MissionPanel: React.FC = () => {
-  const { missions, currentSite, selectedMission, setSelectedMission } = useAppStore();
-  const { getReplanCount } = usePolicyStore();
+  const { missions, currentSite, selectedMission, setSelectedMission, kpi } = useAppStore();
   const [showDialog, setShowDialog] = useState(false);
 
   const siteMissions = missions.filter((mission) => mission.site_id === currentSite);
@@ -98,10 +96,10 @@ const MissionPanel: React.FC = () => {
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(mission.status)}`}>
                 {mission.status.toUpperCase()}
               </span>
-              {getReplanCount(mission.id) > 0 && (
+              {kpi.replans_count > 0 && (
                 <div className="flex items-center space-x-1 text-xs text-blue-400">
                   <RotateCcw className="w-3 h-3" />
-                  <span>{getReplanCount(mission.id)}x</span>
+                  <span>Replanned</span>
                 </div>
               )}
             </div>

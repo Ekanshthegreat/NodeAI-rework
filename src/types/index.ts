@@ -94,6 +94,7 @@ export interface Robot {
   };
   battery: number;
   status: string;
+  capabilities?: string[];
   updated_at: string;
 }
 

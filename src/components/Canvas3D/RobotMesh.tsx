@@ -13,8 +13,26 @@ interface RobotMeshProps {
 
 const RobotMesh: React.FC<RobotMeshProps> = ({ robot, position, rotation }) => {
   const meshRef = useRef<Mesh>(null);
+  const pulseRef = useRef<Mesh>(null);
   const selectedRobot = useAppStore((state) => state.selectedRobot);
   const isSelected = selectedRobot === robot.id;
+  
+  // Track if this robot was recently reassigned for pulse effect
+  const [showPulse, setShowPulse] = React.useState(false);
+  
+  React.useEffect(() => {
+    // Listen for replan events that assign to this robot
+    const checkForReassignment = () => {
+      // This would be triggered by policy engine reassignments
+      // For now, we'll simulate it when robot status changes to ACTIVE
+      if (robot.status === 'ACTIVE') {
+        setShowPulse(true);
+        setTimeout(() => setShowPulse(false), 1500);
+      }
+    };
+    
+    checkForReassignment();
+  }, [robot.status]);
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -38,10 +56,24 @@ const RobotMesh: React.FC<RobotMeshProps> = ({ robot, position, rotation }) => {
       // Gentle floating animation for selected robot
       meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 2) * 0.1;
     }
+    
+    if (pulseRef.current && showPulse) {
+      // Pulsing ring animation for reassigned robots
+      const scale = 1 + Math.sin(state.clock.elapsedTime * 8) * 0.3;
+      pulseRef.current.scale.setScalar(scale);
+    }
   });
 
   return (
     <group position={position} rotation={rotation}>
+      {/* Pulse ring for reassigned robots */}
+      {showPulse && (
+        <mesh ref={pulseRef} position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.8, 1.0, 16]} />
+          <meshBasicMaterial color="#3b82f6" transparent opacity={0.6} />
+        </mesh>
+      )}
+      
       {/* Main robot body */}
       <mesh ref={meshRef} castShadow receiveShadow>
         <boxGeometry args={[0.8, 0.6, 1.2]} />

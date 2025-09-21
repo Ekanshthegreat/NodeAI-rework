@@ -4,14 +4,14 @@ import { useAppStore } from '../store/useAppStore';
 import { useSceneStore } from '../store/useSceneStore';
 import DevPanel from '../components/DevPanel';
 import { generateMockData } from '../utils/mockData';
-import { usePolicyEngine } from '../hooks/usePolicyEngine';
+import { useTelemetry } from '../hooks/useTelemetry';
 
 const DashboardPage: React.FC = () => {
   const { currentSite, setCurrentSite, setSites, setRobots, setMissions } = useAppStore();
   const { addPath, addOverlay, clearPaths, clearOverlays } = useSceneStore();
 
-  // Initialize policy engine
-  usePolicyEngine();
+  // Initialize telemetry with policy engine
+  useTelemetry();
 
   useEffect(() => {
     // Load initial mock data

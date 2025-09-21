@@ -1,9 +1,10 @@
 import React from 'react';
-import { ScrollText, Circle, GitBranch, Activity, AlertTriangle, Info, Zap } from 'lucide-react';
+import { ScrollText, Circle, GitBranch, Activity, AlertTriangle, Info, Zap, Eye } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 
 const EventLog: React.FC = () => {
   const { telemetryBuffer, events } = useAppStore();
+  const [selectedDiff, setSelectedDiff] = React.useState<any>(null);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -88,7 +89,7 @@ const EventLog: React.FC = () => {
               {new Date(event.ts).toLocaleTimeString()}
             </span>
             
-            {event.type === 'replan_event' ? (
+            {event.payload?.reason ? (
               <GitBranch className="w-3 h-3 text-orange-400" />
             ) : event.type === 'system' ? (
               <AlertTriangle className="w-3 h-3 text-yellow-400" />
@@ -97,23 +98,28 @@ const EventLog: React.FC = () => {
             )}
             
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-              event.type === 'replan_event' ? 'bg-orange-500/20 text-orange-400' :
+              event.payload?.reason ? 'bg-orange-500/20 text-orange-400' :
               event.type === 'system' ? 'bg-yellow-500/20 text-yellow-400' :
               'bg-purple-500/20 text-purple-400'
             }`}>
-              {event.type}
+              {event.payload?.reason ? 'Auto-replan' : event.type}
             </span>
             
-            {event.mission_id && (
-              <span className="text-slate-300 text-xs font-mono">
-                #{event.mission_id.slice(-6)}
-              </span>
-            )}
+            <div className="flex-1 text-slate-300 text-xs">
+              {typeof event.payload === 'object' && event.payload?.msg ? 
+                event.payload.msg : 
+                (event as any).msg || 'System event'
+              }
+            </div>
             
-            {event.payload?.reason && (
-              <span className="text-yellow-300 text-xs bg-yellow-500/20 px-2 py-0.5 rounded-full">
-                {event.payload.reason}
-              </span>
+            {event.payload?.before && event.payload?.after && (
+              <button
+                onClick={() => setSelectedDiff({ before: event.payload.before, after: event.payload.after })}
+                className="flex items-center space-x-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                <Eye className="w-3 h-3" />
+                <span>Diff</span>
+              </button>
             )}
           </div>
         ))}
@@ -126,6 +132,38 @@ const EventLog: React.FC = () => {
           </div>
         )}
       </div>
+      
+      {/* Diff Modal */}
+      {selectedDiff && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-900 rounded-lg border border-slate-700 p-6 w-full max-w-4xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Plan Diff</h3>
+              <button
+                onClick={() => setSelectedDiff(null)}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <AlertTriangle className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-sm font-medium text-red-400 mb-2">Before</h4>
+                <pre className="text-xs text-slate-300 bg-slate-800 p-3 rounded overflow-auto max-h-96">
+                  {JSON.stringify(selectedDiff.before, null, 2)}
+                </pre>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-green-400 mb-2">After</h4>
+                <pre className="text-xs text-slate-300 bg-slate-800 p-3 rounded overflow-auto max-h-96">
+                  {JSON.stringify(selectedDiff.after, null, 2)}
+                </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
