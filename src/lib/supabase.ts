@@ -45,9 +45,6 @@ export const isUsingMockClient = !supabaseUrl || !supabaseAnonKey;
 if (isUsingMockClient) {
   console.warn('Using mock Supabase client - set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for real data');
 }
-    },
-  },
-});
 
 // Site management helpers
 export const upsertSite = async (site: {
