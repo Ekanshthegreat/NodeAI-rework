@@ -1,33 +1,14 @@
 import React from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { useSceneStore } from '../../store/useSceneStore';
 import RobotMesh from './RobotMesh';
-import PathRenderer from './PathRenderer';
-import OverlayRenderer from './OverlayRenderer';
-import SceneAxes from './SceneAxes';
 
 const Scene: React.FC = () => {
-  const { robots, currentSite, sites } = useAppStore();
-  const { selectedSiteId, setSelectedSiteId, setRobots } = useSceneStore();
+  const { robots, currentSite } = useAppStore();
   
-  // Sync with app store
-  React.useEffect(() => {
-    if (currentSite !== selectedSiteId) {
-      setSelectedSiteId(currentSite);
-    }
-  }, [currentSite, selectedSiteId, setSelectedSiteId]);
-  
-  React.useEffect(() => {
-    setRobots(robots);
-  }, [robots, setRobots]);
-  
-  const siteRobots = robots.filter(robot => robot.site_id === (selectedSiteId || currentSite));
+  const siteRobots = robots.filter(robot => robot.site_id === currentSite);
 
   return (
     <group>
-      {/* Scene Axes */}
-      <SceneAxes />
-      
       {/* Floor */}
       <mesh position={[0, -0.1, 0]} receiveShadow>
         <boxGeometry args={[20, 0.1, 20]} />
@@ -44,13 +25,7 @@ const Scene: React.FC = () => {
         />
       ))}
       
-      {/* Paths */}
-      <PathRenderer />
-      
-      {/* Overlays */}
-      <OverlayRenderer />
-      
-      {/* Reference Objects */}
+      {/* Reference Objects for scale */}
       <mesh position={[0, 0.1, 0]}>
         <boxGeometry args={[1, 0.2, 1]} />
         <meshStandardMaterial color="#2d3748" />

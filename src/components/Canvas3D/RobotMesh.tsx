@@ -115,7 +115,6 @@ const RobotMesh: React.FC<RobotMeshProps> = ({ robot, position, rotation }) => {
         color={isSelected ? '#60a5fa' : '#d1d5db'}
         anchorX="center"
         anchorY="middle"
-        font="/fonts/inter-regular.woff"
       >
         {robot.id}
       </Text>
@@ -127,7 +126,6 @@ const RobotMesh: React.FC<RobotMeshProps> = ({ robot, position, rotation }) => {
         color={getStatusColor(robot.status)}
         anchorX="center"
         anchorY="middle"
-        font="/fonts/inter-regular.woff"
       >
         {robot.status}
       </Text>

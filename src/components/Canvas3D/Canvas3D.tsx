@@ -19,7 +19,7 @@ export const Canvas3D: React.FC = () => {
           gl.setClearColor('#0f172a', 1);
         }}
       >
-        {/* Simple Lighting */}
+        {/* Lighting */}
         <ambientLight intensity={0.6} />
         <directionalLight position={[10, 10, 10]} intensity={0.8} />
         
