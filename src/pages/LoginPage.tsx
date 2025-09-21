@@ -83,15 +83,12 @@ const LoginPage: React.FC = () => {
   const handleDemoLogin = async () => {
     setIsLoading(true);
     try {
-      const demoEmail = 'exchawla@gmail.com';
-      const demoPassword = 'demo123';
+      const demoEmail = 'demo@nodeai.com';
+      const demoPassword = 'demo123456';
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email: demoEmail,
         password: demoPassword,
-        options: {
-          emailRedirectTo: undefined,
-        }
       });
       
       if (error) {
@@ -99,9 +96,6 @@ const LoginPage: React.FC = () => {
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: demoEmail,
           password: demoPassword,
-          options: {
-            emailRedirectTo: undefined,
-          }
         });
         
         if (signUpError) throw signUpError;
@@ -214,7 +208,7 @@ const LoginPage: React.FC = () => {
             </button>
             
             <p className="text-sm text-slate-400 mt-2">
-              Demo credentials: exchawla@gmail.com / demo123
+              Demo credentials: demo@nodeai.com / demo123456
             </p>
           </div>
         </div>
