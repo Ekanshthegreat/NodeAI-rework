@@ -46,6 +46,31 @@ if (isUsingMockClient) {
   console.warn('Using mock Supabase client - set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for real data');
 }
 
+// Map URL resolution
+export const getSignedMapUrl = async (mapUrl: string): Promise<string> => {
+  if (isUsingMockClient) {
+    // Return a mock hospital map URL
+    return '/maps/hospital-demo.png';
+  }
+  
+  // If it's already a full URL, return as-is
+  if (mapUrl.startsWith('http://') || mapUrl.startsWith('https://')) {
+    return mapUrl;
+  }
+  
+  // If it's a Supabase storage path, create signed URL
+  try {
+    const { data } = supabase.storage
+      .from('maps')
+      .getPublicUrl(mapUrl);
+    
+    return data.publicUrl;
+  } catch (error) {
+    console.warn('Failed to get signed URL for map:', error);
+    return '/maps/hospital-demo.png'; // Fallback
+  }
+};
+
 // Site management helpers
 export const upsertSite = async (site: {
   id: string;

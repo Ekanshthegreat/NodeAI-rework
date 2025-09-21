@@ -1,9 +1,9 @@
-import React, { useRef, useMemo } from 'react';
-import { useLoader, useFrame } from '@react-three/fiber';
-import { TextureLoader, RepeatWrapping } from 'three';
+import React, { useRef, useMemo, useEffect, useState } from 'react';
+import { useLoader } from '@react-three/fiber';
+import { TextureLoader } from 'three';
 import * as THREE from 'three';
 import type { Site } from '../../types';
-import { useAppStore } from '../../store/useAppStore';
+import { getSignedMapUrl } from '../../lib/supabase';
 
 interface MapLayerProps {
   site: Site;
@@ -12,27 +12,44 @@ interface MapLayerProps {
 
 const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   const meshRef = useRef<THREE.Mesh>(null);
-  const { sites } = useAppStore();
+  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
+  const [textureLoaded, setTextureLoaded] = useState(false);
   
-  // Get the latest site data from the store
-  const currentSiteData = sites.find(s => s.id === site.id) || site;
+  // Resolve map URL
+  useEffect(() => {
+    const resolveMapUrl = async () => {
+      try {
+        if (site.map_url) {
+          const resolved = await getSignedMapUrl(site.map_url);
+          setMapUrlResolved(resolved);
+        }
+      } catch (error) {
+        console.warn('Failed to resolve map URL:', error);
+        setMapUrlResolved(null);
+      }
+    };
+    
+    resolveMapUrl();
+  }, [site.map_url]);
   
-  // Load the map texture with error handling
+  // Create texture
   const texture = useMemo(() => {
-    try {
+    if (!mapUrlResolved) {
+      // Create fallback grid texture
       const canvas = document.createElement('canvas');
       canvas.width = 512;
       canvas.height = 512;
       const ctx = canvas.getContext('2d');
       
       if (ctx) {
-        // Create a simple grid pattern as fallback
+        // Dark hospital floor
         ctx.fillStyle = '#1e293b';
         ctx.fillRect(0, 0, 512, 512);
+        
+        // Grid lines
         ctx.strokeStyle = '#475569';
         ctx.lineWidth = 1;
         
-        // Draw grid lines
         for (let i = 0; i <= 512; i += 32) {
           ctx.beginPath();
           ctx.moveTo(i, 0);
@@ -45,50 +62,63 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
           ctx.stroke();
         }
         
-        // Add site name
+        // Hospital areas (simplified)
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(100, 100, 80, 60); // Pharmacy
+        ctx.fillRect(300, 300, 100, 80); // Ward A
+        ctx.fillRect(400, 100, 60, 60); // Lab
+        
+        // Labels
         ctx.fillStyle = '#94a3b8';
-        ctx.font = '24px Arial';
+        ctx.font = '14px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(currentSiteData.name, 256, 256);
+        ctx.fillText('Pharmacy', 140, 135);
+        ctx.fillText('Ward A', 350, 345);
+        ctx.fillText('Lab', 430, 135);
+        ctx.fillText(site.name, 256, 50);
       }
       
       const fallbackTexture = new THREE.CanvasTexture(canvas);
-      
-      // For now, just use the fallback texture
-      // TODO: Load actual map images when available
+      fallbackTexture.wrapS = THREE.RepeatWrapping;
+      fallbackTexture.wrapT = THREE.RepeatWrapping;
+      setTextureLoaded(true);
       return fallbackTexture;
-    } catch (error) {
-      console.warn('Error creating map texture:', error);
-      // Return a basic colored texture as last resort
-      const canvas = document.createElement('canvas');
-      canvas.width = 256;
-      canvas.height = 256;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(0, 0, 256, 256);
-      }
-      return new THREE.CanvasTexture(canvas);
     }
-  }, [currentSiteData.map_url, currentSiteData.name]);
+    
+    // Try to load actual map image
+    const loader = new TextureLoader();
+    const mapTexture = loader.load(
+      mapUrlResolved,
+      () => setTextureLoaded(true),
+      undefined,
+      (error) => {
+        console.warn('Failed to load map texture:', error);
+        setTextureLoaded(true);
+      }
+    );
+    
+    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
+    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
+    return mapTexture;
+  }, [mapUrlResolved, site.name]);
   
   // Calculate plane dimensions based on scale
   const planeDimensions = useMemo(() => {
-    // Use standard map size for consistent scaling
+    // Standard map size for consistent scaling
     const mapWidth = 1024;
     const mapHeight = 1024;
     
     // Convert pixels to meters using the site's scale
-    const worldWidth = mapWidth * currentSiteData.scale_m_per_px;
-    const worldHeight = mapHeight * currentSiteData.scale_m_per_px;
+    const worldWidth = mapWidth * site.scale_m_per_px;
+    const worldHeight = mapHeight * site.scale_m_per_px;
     
     return [worldWidth, worldHeight];
-  }, [currentSiteData.scale_m_per_px]);
+  }, [site.scale_m_per_px]);
   
-  if (!visible) return null;
+  if (!visible || !textureLoaded) return null;
   
   return (
-    <group position={[currentSiteData.origin.x, 0, currentSiteData.origin.y]}>
+    <group position={[site.origin.x, 0, site.origin.y]}>
       <mesh
         ref={meshRef}
         rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
@@ -99,7 +129,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
         <meshStandardMaterial
           map={texture}
           transparent
-          opacity={0.8}
+          opacity={0.9}
           depthWrite={false}
         />
       </mesh>
@@ -107,7 +137,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
       {/* Optional: Add a subtle border */}
       <lineSegments position={[0, 0.02, 0]}>
         <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
-        <lineBasicMaterial color="#4a5568" opacity={0.5} transparent />
+        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
       </lineSegments>
     </group>
   );

@@ -1,19 +1,23 @@
 import React from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import RobotMesh from './RobotMesh';
+import MapLayer from './MapLayer';
+import PathRenderer from './PathRenderer';
+import ObstacleRenderer from './ObstacleRenderer';
+import AnchorRenderer from './AnchorRenderer';
 
 const Scene: React.FC = () => {
-  const { robots, currentSite } = useAppStore();
+  const { robots, currentSite, sites } = useAppStore();
   
   const siteRobots = robots.filter(robot => robot.site_id === currentSite);
+  const currentSiteData = sites.find(site => site.id === currentSite);
 
   return (
     <group>
-      {/* Floor */}
-      <mesh position={[0, -0.1, 0]} receiveShadow>
-        <boxGeometry args={[20, 0.1, 20]} />
-        <meshStandardMaterial color="#374151" />
-      </mesh>
+      {/* Map layer */}
+      {currentSiteData && (
+        <MapLayer site={currentSiteData} visible={true} />
+      )}
       
       {/* Robots */}
       {siteRobots.map((robot) => (
@@ -25,20 +29,19 @@ const Scene: React.FC = () => {
         />
       ))}
       
-      {/* Reference Objects for scale */}
+      {/* Mission paths */}
+      <PathRenderer />
+      
+      {/* Obstacles and no-go zones */}
+      <ObstacleRenderer />
+      
+      {/* Named anchors/locations */}
+      <AnchorRenderer />
+      
+      {/* Reference lighting objects */}
       <mesh position={[0, 0.1, 0]}>
-        <boxGeometry args={[1, 0.2, 1]} />
+        <boxGeometry args={[0.5, 0.2, 0.5]} />
         <meshStandardMaterial color="#2d3748" />
-      </mesh>
-      
-      <mesh position={[5, 0.5, 5]}>
-        <cylinderGeometry args={[0.5, 0.5, 1]} />
-        <meshStandardMaterial color="#e53e3e" />
-      </mesh>
-      
-      <mesh position={[-5, 0.5, -5]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#3182ce" />
       </mesh>
     </group>
   );

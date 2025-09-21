@@ -4,6 +4,8 @@ import { useAppStore } from '../store/useAppStore';
 import { useSceneStore } from '../store/useSceneStore';
 import DevPanel from '../components/DevPanel';
 import { useTelemetry } from '../hooks/useTelemetry';
+import { compileMissionPath } from '../lib/planner_path';
+import { compileNLToPlan } from '../lib/planner';
 import { toast } from 'react-hot-toast';
 
 const DashboardPage: React.FC = () => {
@@ -13,9 +15,10 @@ const DashboardPage: React.FC = () => {
     setSites, 
     setRobots, 
     setMissions,
+    setMissionPlan,
     pushEvent 
   } = useAppStore();
-  const { addPath, addOverlay, clearPaths, clearOverlays } = useSceneStore();
+  const { addPath, addOverlay, clearPaths, clearOverlays, setMissionPath } = useSceneStore();
 
   // Initialize telemetry with policy engine
   useTelemetry();
@@ -29,6 +32,13 @@ const DashboardPage: React.FC = () => {
         map_url: '/maps/hospital-f2.png',
         origin: { x: 0, y: 0 },
         scale_m_per_px: 0.05,
+        obstacles: [
+          { id: 'obs-1', rect: { x: 1, y: 1, w: 1, h: 1 } },
+          { id: 'obs-2', rect: { x: -2, y: 3, w: 0.5, h: 2 } },
+        ],
+        noGo: [
+          { id: 'nogo-1', poly: [{ x: 6, y: 6 }, { x: 8, y: 6 }, { x: 7, y: 8 }] },
+        ],
         created_at: new Date().toISOString(),
       }
     ];
@@ -94,56 +104,38 @@ const DashboardPage: React.FC = () => {
     setRobots(mockRobots);
     setMissions(mockMissions);
     
+    // Generate mission plans and paths for demo missions
+    mockMissions.forEach((mission, index) => {
+      const siteRobots = mockRobots.filter(r => r.site_id === mission.site_id);
+      if (siteRobots.length > 0) {
+        const plan = compileNLToPlan(mission.nl, mission.site_id, siteRobots);
+        setMissionPlan(mission.id, plan);
+        
+        const assignedRobot = siteRobots.find(r => r.id === plan.robot_selection.include[0]);
+        if (assignedRobot) {
+          const missionPath = compileMissionPath(mission, plan, assignedRobot.pose);
+          setMissionPath(mission.id, missionPath);
+        }
+      }
+    });
+    
     // Set default site
     if (!currentSite) {
       setCurrentSite(mockSites[0].id);
     }
     
-    // Add demo paths and overlays
+    // Clear old paths and overlays
     clearPaths();
     clearOverlays();
-    
-    // Demo path for first robot
-    addPath({
-      id: 'demo-path-1',
-      robotId: mockRobots[0].id,
-      points: [
-        { x: 0, y: 0 },
-        { x: 2, y: 3 },
-        { x: 5, y: 5 },
-        { x: 3, y: 8 }
-      ],
-      color: '#10b981',
-      visible: true,
-    });
-    
-    // Demo overlays
-    addOverlay({
-      id: 'waypoint-1',
-      type: 'waypoint',
-      position: { x: 2, y: 3 },
-      label: 'Pickup',
-      color: '#3b82f6',
-      visible: true,
-    });
-    
-    addOverlay({
-      id: 'zone-1',
-      type: 'zone',
-      position: { x: 5, y: 5 },
-      label: 'Loading Zone',
-      color: '#f59e0b',
-      visible: true,
-    });
     
     pushEvent({
       ts: Date.now(),
       level: 'INFO',
-      msg: `Dashboard loaded: ${mockSites.length} sites, ${mockRobots.length} robots, ${mockMissions.length} missions`,
+      msg: `Hospital demo loaded: ${mockSites.length} sites, ${mockRobots.length} robots, ${mockMissions.length} missions with paths`,
       payload: { sites: mockSites.length, robots: mockRobots.length, missions: mockMissions.length }
     });
 
-    toast.success('Hospital demo data loaded successfully');
+    toast.success('Hospital demo with mission paths loaded successfully');
   }, []);
 
   return (

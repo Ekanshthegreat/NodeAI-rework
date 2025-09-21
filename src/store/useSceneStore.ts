@@ -25,6 +25,11 @@ interface SceneStore {
   robots: Robot[];
   paths: Path[];
   overlays: Overlay[];
+  missionPaths: Record<string, {
+    waypoints: Array<{ x: number; y: number; theta: number }>;
+    updated_at: number;
+  }>;
+  pathSpeed: number; // m/s
   
   // Camera state
   cameraPosition: [number, number, number];
@@ -47,6 +52,9 @@ interface SceneStore {
   setFPS: (fps: number) => void;
   clearPaths: () => void;
   clearOverlays: () => void;
+  setMissionPath: (missionId: string, waypoints: Array<{ x: number; y: number; theta: number }>) => void;
+  getMissionPath: (missionId: string) => Array<{ x: number; y: number; theta: number }> | null;
+  setPathSpeed: (speed: number) => void;
 }
 
 export const useSceneStore = create<SceneStore>()(
@@ -57,6 +65,8 @@ export const useSceneStore = create<SceneStore>()(
       robots: [],
       paths: [],
       overlays: [],
+      missionPaths: {},
+      pathSpeed: 0.6, // m/s
       cameraPosition: [10, 10, 10],
       cameraTarget: [0, 0, 0],
       fps: 60,
@@ -132,6 +142,29 @@ export const useSceneStore = create<SceneStore>()(
       
       clearOverlays: () =>
         set({ overlays: [] }, false, 'clearOverlays'),
+      
+      setMissionPath: (missionId, waypoints) =>
+        set(
+          (state) => ({
+            missionPaths: {
+              ...state.missionPaths,
+              [missionId]: {
+                waypoints,
+                updated_at: Date.now(),
+              },
+            },
+          }),
+          false,
+          'setMissionPath'
+        ),
+      
+      getMissionPath: (missionId) => {
+        const state = get();
+        return state.missionPaths[missionId]?.waypoints || null;
+      },
+      
+      setPathSpeed: (speed) =>
+        set({ pathSpeed: speed }, false, 'setPathSpeed'),
       
       // Calibration actions
       setCalibrationPoints: (points) =>

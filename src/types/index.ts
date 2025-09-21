@@ -107,6 +107,14 @@ export interface Site {
     y: number;
   };
   scale_m_per_px: number;
+  obstacles?: Array<{
+    id: string;
+    rect: { x: number; y: number; w: number; h: number };
+  }>;
+  noGo?: Array<{
+    id: string;
+    poly: Array<{ x: number; y: number }>;
+  }>;
 }
 
 // UI State Types

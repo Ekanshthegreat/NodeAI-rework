@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Settings, Zap, Battery, Square, RotateCcw, AlertTriangle, Shield, ShieldOff } from 'lucide-react';
+import { Settings, Zap, Battery, Square, RotateCcw, AlertTriangle, Shield, ShieldOff, Gauge } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAppStore } from '../store/useAppStore';
+import { useSceneStore } from '../store/useSceneStore';
 
 const DevPanel: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -14,6 +15,7 @@ const DevPanel: React.FC = () => {
     setFault, 
     pushEvent 
   } = useAppStore();
+  const { pathSpeed, setPathSpeed } = useSceneStore();
 
   // Only show in development with feature flag
   if (import.meta.env.VITE_SHOW_DEV_PANEL !== 'true') {
@@ -196,6 +198,26 @@ const DevPanel: React.FC = () => {
                   <RotateCcw className="w-4 h-4" />
                   <span>Reset Seed Data</span>
                 </button>
+              </div>
+              
+              {/* Path Speed Control */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-slate-300">Path Speed</h3>
+                
+                <div className="space-y-2">
+                  <label className="block text-xs text-slate-400">
+                    Speed: {pathSpeed.toFixed(1)} m/s
+                  </label>
+                  <input
+                    type="range"
+                    min="0.2"
+                    max="1.2"
+                    step="0.1"
+                    value={pathSpeed}
+                    onChange={(e) => setPathSpeed(parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
               </div>
               
               {/* Policy Configuration */}

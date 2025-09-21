@@ -3,9 +3,11 @@ import { Dialog } from '@headlessui/react';
 import { X, Send } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAppStore } from '../../store/useAppStore';
+import { useSceneStore } from '../../store/useSceneStore';
 import { usePolicyStore } from '../../store/usePolicyStore';
 import { generateMissionId } from '../../utils/generators';
 import { compileNLToPlan } from '../../lib/planner';
+import { compileMissionPath } from '../../lib/planner_path';
 import { saveMissionPlan } from '../../lib/db';
 import { supabase } from '../../lib/supabase';
 
@@ -20,6 +22,7 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { currentSite, missions, setMissions, robots, addEvent } = useAppStore();
+  const { setMissionPath } = useSceneStore();
   const { setMissionPlan } = usePolicyStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,6 +60,17 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
       
       // Store in policy store
       setMissionPlan(missionId, plan);
+      
+      // Compile and store mission path
+      const assignedRobot = siteRobots.find(r => r.id === plan.robot_selection.include[0]);
+      if (assignedRobot) {
+        const missionPath = compileMissionPath(
+          { id: missionId, nl: naturalLanguage.trim() },
+          plan,
+          assignedRobot.pose
+        );
+        setMissionPath(missionId, missionPath);
+      }
       
       // Update local state
       const newMission = {

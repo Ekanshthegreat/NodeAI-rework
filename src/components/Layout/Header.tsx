@@ -49,18 +49,18 @@ const Header: React.FC = () => {
 
       <div className="flex items-center space-x-6">
         {/* KPI Strip */}
-        <div className="hidden lg:flex items-center space-x-4 text-xs text-slate-400">
+        <div className="flex items-center space-x-4 text-xs text-slate-400">
           <div className="flex items-center space-x-1">
             <span className="text-slate-500">Replans:</span>
-            <span className="text-slate-300 font-mono">{kpi.replans_count}</span>
+            <span className="text-slate-300 font-mono">{kpi.replans_count || 0}</span>
           </div>
           <div className="flex items-center space-x-1">
             <span className="text-slate-500">Interventions:</span>
-            <span className="text-green-400 font-mono">{kpi.interventions_avoided}</span>
+            <span className="text-green-400 font-mono">{kpi.interventions_avoided || 0}</span>
           </div>
           <div className="flex items-center space-x-1">
             <span className="text-slate-500">MTTR:</span>
-            <span className="text-blue-400 font-mono">{Math.round(kpi.mttr_ms_avg / 1000)}s</span>
+            <span className="text-blue-400 font-mono">{Math.max(1, Math.round((kpi.mttr_ms_avg || 0) / 1000))}s</span>
           </div>
         </div>
         
