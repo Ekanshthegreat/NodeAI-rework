@@ -1,14 +1,12 @@
 import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { useLoader } from '@react-three/fiber';
 import { TextureLoader } from 'three';
-    ], { onConflict: 'id' })
 import type { Site } from '../../types';
 import { getSignedMapUrl } from '../../lib/supabase';
 import { useAppStore } from '../../store/useAppStore';
-import { useAppStore } from '../../store/useAppStore';
 
 interface MapLayerProps {
-  console.log('[DEMO] Database seeded successfully:', {
+  site: Site;
   visible?: boolean;
 }
 
@@ -106,12 +104,9 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
       const fallbackTexture = new THREE.CanvasTexture(canvas);
       fallbackTexture.wrapS = THREE.RepeatWrapping;
       fallbackTexture.wrapT = THREE.RepeatWrapping;
-    .upsert({
       setTextureLoaded(true);
-    // Always reseed for demo reset functionality
-      map_url: 'hospital.png', // Relative path for Supabase storage
-    // if (sites && sites.length > 0) {
-    // }
+      return fallbackTexture;
+    }
     
     // Try to load actual map image
     const loader = new TextureLoader();
@@ -121,8 +116,8 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
       undefined,
       (error) => {
         console.warn('Failed to load map texture:', error);
-    .upsert([
         setTextureLoaded(true);
+      }
     );
     
     mapTexture.wrapS = THREE.ClampToEdgeWrapping;
@@ -146,8 +141,8 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   if (!visible || !textureLoaded) return null;
   
   return (
-    ], { onConflict: 'id' });
     <group position={[site.origin.x, 0, site.origin.y]}>
+      <mesh
         ref={meshRef}
         rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
         position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
@@ -155,23 +150,20 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
       >
         <planeGeometry args={planeDimensions} />
         <meshStandardMaterial
-    .upsert([
           map={texture}
+          transparent
           opacity={0.9}
-        id: 'demo-mission-001',
           depthWrite={false}
         />
       </mesh>
       
       {/* Optional: Add a subtle border */}
       <lineSegments position={[0, 0.02, 0]}>
-        id: 'demo-mission-002',
         <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
         <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
       </lineSegments>
     </group>
   );
-  console.log('[DEMO] Seeding database with initial data...');
-        id: 'demo-mission-003',
+};
 
 export default MapLayer;
