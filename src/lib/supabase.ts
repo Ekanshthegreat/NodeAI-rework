@@ -47,10 +47,10 @@ if (isUsingMockClient) {
 }
 
 // Map URL resolution
-export const getSignedMapUrl = async (mapUrl: string): Promise<string> => {
+export const getSignedMapUrl = async (mapUrl: string): Promise<string | null> => {
   if (isUsingMockClient) {
     // Return a mock hospital map URL
-    return '/maps/hospital-demo.png';
+    return createMockHospitalMap();
   }
   
   // If it's already a full URL, return as-is
@@ -60,15 +60,101 @@ export const getSignedMapUrl = async (mapUrl: string): Promise<string> => {
   
   // If it's a Supabase storage path, create signed URL
   try {
-    const { data } = supabase.storage
+    const bucket = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'maps';
+    const { data, error } = await supabase.storage
       .from('maps')
-      .getPublicUrl(mapUrl);
+      .createSignedUrl(mapUrl, 3600); // 1 hour expiry
     
-    return data.publicUrl;
+    if (error) {
+      console.warn('Failed to create signed URL:', error);
+      // Log to event system if available
+      if (typeof window !== 'undefined' && (window as any).nodeai_eventLog) {
+        (window as any).nodeai_eventLog({
+          level: 'WARN',
+          msg: `Map load failed: ${error.message}`,
+          payload: { error, mapUrl }
+        });
+      }
+      return null;
+    }
+    
+    return data.signedUrl;
   } catch (error) {
     console.warn('Failed to get signed URL for map:', error);
-    return '/maps/hospital-demo.png'; // Fallback
+    // Log to event system if available
+    if (typeof window !== 'undefined' && (window as any).nodeai_eventLog) {
+      (window as any).nodeai_eventLog({
+        level: 'WARN',
+        msg: `Map storage error: ${(error as Error).message}`,
+        payload: { error, mapUrl }
+      });
+    }
+    return null;
   }
+};
+
+// Create a mock hospital map as data URL for demo mode
+function createMockHospitalMap(): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 1024;
+  const ctx = canvas.getContext('2d');
+  
+  if (!ctx) return '';
+  
+  // Hospital floor background
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(0, 0, 1024, 1024);
+  
+  // Grid lines
+  ctx.strokeStyle = '#e2e8f0';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 1024; i += 64) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, 1024);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    ctx.lineTo(1024, i);
+    ctx.stroke();
+  }
+  
+  // Hospital rooms and areas
+  const rooms = [
+    { x: 200, y: 200, w: 150, h: 100, label: 'Pharmacy', color: '#dbeafe' },
+    { x: 600, y: 600, w: 200, h: 150, label: 'Ward A', color: '#dcfce7' },
+    { x: 750, y: 200, w: 120, h: 120, label: 'Laboratory', color: '#fef3c7' },
+    { x: 100, y: 500, w: 100, h: 80, label: 'Room 205', color: '#f3e8ff' },
+    { x: 300, y: 500, w: 100, h: 80, label: 'Room 210', color: '#f3e8ff' },
+    { x: 100, y: 800, w: 150, h: 100, label: 'Charging', color: '#fecaca' },
+  ];
+  
+  rooms.forEach(room => {
+    // Room background
+    ctx.fillStyle = room.color;
+    ctx.fillRect(room.x, room.y, room.w, room.h);
+    
+    // Room border
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(room.x, room.y, room.w, room.h);
+    
+    // Room label
+    ctx.fillStyle = '#1e293b';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(room.label, room.x + room.w/2, room.y + room.h/2 + 6);
+  });
+  
+  // Hospital title
+  ctx.fillStyle = '#0f172a';
+  ctx.font = 'bold 24px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Hospital Alpha - Floor 2', 512, 50);
+  
+  return canvas.toDataURL('image/png');
 };
 
 // Site management helpers

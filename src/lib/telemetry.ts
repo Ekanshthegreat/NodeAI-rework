@@ -19,80 +19,97 @@ function startMockTelemetry() {
   const interval = setInterval(() => {
     const appState = useAppStore.getState();
     const sceneState = useSceneStore.getState();
-    if (!appState.telemetryEnabled) return;
+    
+    try {
+      if (!appState.telemetryEnabled) return;
 
-    // Generate telemetry for each robot
-    appState.robots.forEach(robot => {
-      const fault = appState.faultInjected[robot.id];
-      const now = Date.now();
-      
-      // Apply fault injection
-      let pose = robot.pose;
-      let battery = robot.battery;
-      let status = robot.status;
-
-      // Blocked fault: freeze pose
-      if (fault?.blockedUntil && now < fault.blockedUntil) {
-        // Keep pose constant, but mark as BLOCKED
-        status = 'BLOCKED';
-      } else if (fault?.blockedUntil && now >= fault.blockedUntil) {
-        // Clear expired blocked fault
-        appState.setFault(robot.id, {});
-        status = 'IDLE';
-      }
-
-      // Battery drain fault
-      if (fault?.drained) {
-        battery = Math.min(0.15, battery);
-        // Auto-clear after 30 seconds
-        if (!fault.blockedUntil || now > (fault.blockedUntil || 0)) {
-          setTimeout(() => {
-            const currentFault = useAppStore.getState().faultInjected[robot.id];
-            if (currentFault?.drained) {
-              appState.setFault(robot.id, { ...currentFault, drained: false });
-            }
-          }, 30000);
-        }
-      }
-
-      // Path following or normal movement simulation
-      if (status !== 'BLOCKED' && !fault?.blockedUntil) {
-        // Check if robot is assigned to a mission with a path
-        const assignedMission = appState.missions.find(m => 
-          m.status === 'active' && 
-          appState.missionPlans[m.id]?.robot_selection.include.includes(robot.id)
-        );
+      // Generate telemetry for each robot
+      appState.robots.forEach(robot => {
+        const fault = appState.faultInjected[robot.id];
+        const now = Date.now();
         
-        if (assignedMission && sceneState.missionPaths[assignedMission.id]) {
-          // Follow mission path
-          pose = followMissionPath(robot.id, assignedMission.id, sceneState, now);
-          status = 'ACTIVE';
-        } else {
-          // Default wandering behavior
-          const time = now / 5000;
-          pose = {
-            x: Math.sin(time + robot.id.charCodeAt(0)) * 3,
-            y: Math.cos(time + robot.id.charCodeAt(0) * 0.7) * 2,
-            theta: (time + robot.id.charCodeAt(0)) % (Math.PI * 2),
-          };
+        // Apply fault injection
+        let pose = robot.pose;
+        let battery = robot.battery;
+        let status = robot.status;
+
+        // Blocked fault: freeze pose
+        if (fault?.blockedUntil && now < fault.blockedUntil) {
+          // Keep pose constant, but mark as BLOCKED
+          status = 'BLOCKED';
+        } else if (fault?.blockedUntil && now >= fault.blockedUntil) {
+          // Clear expired blocked fault
+          appState.setFault(robot.id, {});
           status = 'IDLE';
         }
-      }
 
-      const telemetry: TelemetryMessage = {
-        type: 'telemetry',
-        ts: now,
-        robot_id: robot.id,
-        vendor: (robot.vendor as any) || 'mock',
-        pose,
-        vel: status === 'ACTIVE' ? Math.random() * 2 : 0,
-        battery,
-        status: status as any,
-        task_id: status === 'ACTIVE' ? `task-${robot.id}` : null,
-      };
+        // Battery drain fault
+        if (fault?.drained) {
+          battery = Math.min(0.15, battery);
+          // Auto-clear after 30 seconds
+          if (!fault.blockedUntil || now > (fault.blockedUntil || 0)) {
+            setTimeout(() => {
+              const currentFault = useAppStore.getState().faultInjected[robot.id];
+              if (currentFault?.drained) {
+                appState.setFault(robot.id, { ...currentFault, drained: false });
+              }
+            }, 30000);
+          }
+        }
 
-      onTelemetry(telemetry);
-    });
+        // Path following or idle behavior
+        if (status !== 'BLOCKED' && !fault?.blockedUntil) {
+          // Check if robot is assigned to a mission with a path
+          const assignedMission = appState.missions.find(m => 
+            m.status === 'active' && 
+            appState.missionPlans[m.id]?.robot_selection.include.includes(robot.id)
+          );
+          
+          if (assignedMission && sceneState.missionPaths[assignedMission.id]) {
+            // Follow mission path deterministically
+            pose = followMissionPath(robot.id, assignedMission.id, sceneState, now);
+            status = 'ACTIVE';
+          } else {
+            // Idle in place with minor jitter (<0.05m)
+            const jitter = 0.02; // 2cm jitter
+            const time = now / 10000; // Slow jitter
+            pose = {
+              x: robot.pose.x + Math.sin(time + robot.id.charCodeAt(0)) * jitter,
+              y: robot.pose.y + Math.cos(time + robot.id.charCodeAt(0) * 0.7) * jitter,
+              theta: robot.pose.theta + Math.sin(time * 0.5) * 0.05, // Small rotation jitter
+            };
+            status = 'IDLE';
+            
+            // Idle battery drain: 0.1% per second
+            battery = Math.max(0, battery - (0.001 * TELEM_PERIOD_MS / 1000));
+          }
+        }
+
+        const telemetry: TelemetryMessage = {
+          type: 'telemetry',
+          ts: now,
+          robot_id: robot.id,
+          vendor: (robot.vendor as any) || 'mock',
+          pose,
+          vel: status === 'ACTIVE' ? Math.random() * 2 : 0,
+          battery,
+          status: status as any,
+          task_id: status === 'ACTIVE' ? `task-${robot.id}` : null,
+        };
+
+        onTelemetry(telemetry);
+      });
+    } catch (error) {
+      console.error('Telemetry error:', error);
+      // Log to event system
+      const appState = useAppStore.getState();
+      appState.pushEvent({
+        ts: Date.now(),
+        level: 'WARN',
+        msg: `[DEMO] Telemetry error: ${(error as Error).message}`,
+        payload: { error }
+      });
+    }
   }, TELEM_PERIOD_MS);
 
   return () => clearInterval(interval);
