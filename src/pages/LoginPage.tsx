@@ -1,170 +1,152 @@
-import React, { useRef, useMemo, useEffect, useState } from 'react';
-import { useLoader } from '@react-three/fiber';
-import { TextureLoader } from 'three';
-import * as THREE from 'three';
-import type { Site } from '../../types';
-import { getSignedMapUrl } from '../lib/supabase';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { LogIn, Bot } from 'lucide-react';
+import { supabase, isUsingMockClient } from '../lib/supabase';
 import { useAppStore } from '../store/useAppStore';
 
-interface MapLayerProps {
-  site: Site;
-  visible?: boolean;
-}
+const LoginPage: React.FC = () => {
+  const [email, setEmail] = useState('demo@nodeai.com');
+  const [password, setPassword] = useState('demo123');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const { setUser } = useAppStore();
 
-const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
-  const [textureLoaded, setTextureLoaded] = useState(false);
-  const { pushEvent } = useAppStore();
-  
-  // Resolve map URL
-  useEffect(() => {
-    const resolveMapUrl = async () => {
-      try {
-        if (site.map_url) {
-          const resolved = await getSignedMapUrl(site.map_url);
-          setMapUrlResolved(resolved);
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      // Handle demo account or mock client
+      if (isUsingMockClient || email === 'demo@nodeai.com') {
+        if (email === 'demo@nodeai.com' && password === 'demo123') {
+          // Create mock user for demo
+          const mockUser = {
+            id: 'demo-user-id',
+            email: 'demo@nodeai.com',
+            user_metadata: { name: 'Demo User' },
+            app_metadata: {},
+            aud: 'authenticated',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
           
-          if (resolved) {
-            pushEvent({
-              ts: Date.now(),
-              level: 'INFO',
-              msg: `[DEMO] Map loaded: ${site.name}`,
-              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
-            });
-          } else {
-            pushEvent({
-              ts: Date.now(),
-              level: 'WARN',
-              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
-              payload: { site_id: site.id, map_url: site.map_url }
-            });
-          }
+          setUser(mockUser);
+          navigate('/app');
+          return;
+        } else {
+          throw new Error('Invalid demo credentials. Use demo@nodeai.com / demo123');
         }
-      } catch (error) {
-        console.warn('Failed to resolve map URL:', error);
-        setMapUrlResolved(null);
-        pushEvent({
-          ts: Date.now(),
-          level: 'WARN',
-          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
-          payload: { error, site_id: site.id, map_url: site.map_url }
-        });
       }
-    };
-    
-    resolveMapUrl();
-  }, [site.map_url, site.id, site.name, pushEvent]);
-  
-  // Create texture
-  const texture = useMemo(() => {
-    if (!mapUrlResolved) {
-      // Create fallback grid texture
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-      
-      if (ctx) {
-        // Dark hospital floor
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(0, 0, 512, 512);
-        
-        // Grid lines
-        ctx.strokeStyle = '#475569';
-        ctx.lineWidth = 1;
-        
-        for (let i = 0; i <= 512; i += 32) {
-          ctx.beginPath();
-          ctx.moveTo(i, 0);
-          ctx.lineTo(i, 512);
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.moveTo(0, i);
-          ctx.lineTo(512, i);
-          ctx.stroke();
-        }
-        
-        // Hospital areas (simplified)
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(100, 100, 80, 60); // Pharmacy
-        ctx.fillRect(300, 300, 100, 80); // Ward A
-        ctx.fillRect(400, 100, 60, 60); // Lab
-        
-        // Labels
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Pharmacy', 140, 135);
-        ctx.fillText('Ward A', 350, 345);
-        ctx.fillText('Lab', 430, 135);
-        ctx.fillText(site.name, 256, 50);
-      }
-      
-      const fallbackTexture = new THREE.CanvasTexture(canvas);
-      fallbackTexture.wrapS = THREE.RepeatWrapping;
-      fallbackTexture.wrapT = THREE.RepeatWrapping;
-      setTextureLoaded(true);
-      return fallbackTexture;
+
+      // Real Supabase authentication
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) throw authError;
+      if (!data.user) throw new Error('No user returned from authentication');
+
+      setUser(data.user);
+      navigate('/app');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setLoading(false);
     }
-    
-    // Try to load actual map image
-    const loader = new TextureLoader();
-    const mapTexture = loader.load(
-      mapUrlResolved,
-      () => setTextureLoaded(true),
-      undefined,
-      (error) => {
-        console.warn('Failed to load map texture:', error);
-        setTextureLoaded(true);
-      }
-    );
-    
-    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
-    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
-    return mapTexture;
-  }, [mapUrlResolved, site.name]);
-  
-  // Calculate plane dimensions based on scale
-  const planeDimensions = useMemo(() => {
-    // Standard map size for consistent scaling
-    const mapWidth = 1024;
-    const mapHeight = 1024;
-    
-    // Convert pixels to meters using the site's scale
-    const worldWidth = mapWidth * site.scale_m_per_px;
-    const worldHeight = mapHeight * site.scale_m_per_px;
-    
-    return [worldWidth, worldHeight];
-  }, [site.scale_m_per_px]);
-  
-  if (!visible || !textureLoaded) return null;
-  
+  };
+
   return (
-    <group position={[site.origin.x, 0, site.origin.y]}>
-      <mesh
-        ref={meshRef}
-        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
-        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
-        receiveShadow
-      >
-        <planeGeometry args={planeDimensions} />
-        <meshStandardMaterial
-          map={texture}
-          transparent
-          opacity={0.9}
-          depthWrite={false}
-        />
-      </mesh>
-      
-      {/* Optional: Add a subtle border */}
-      <lineSegments position={[0, 0.02, 0]}>
-        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
-        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
-      </lineSegments>
-    </group>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Logo and Title */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
+            <Bot className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">NodeAI</h1>
+          <p className="text-slate-300">Autonomous Robot Fleet Management</p>
+        </div>
+
+        {/* Login Form */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-xl p-8 border border-white/20">
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-slate-200 mb-2">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-slate-200 mb-2">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter your password"
+                required
+              />
+            </div>
+
+            {error && (
+              <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-lg text-red-200 text-sm">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <LogIn className="w-5 h-5 mr-2" />
+                  Sign In
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Demo Account Info */}
+          <div className="mt-6 p-4 bg-blue-500/20 border border-blue-500/30 rounded-lg">
+            <h3 className="text-sm font-medium text-blue-200 mb-2">Demo Account</h3>
+            <div className="text-xs text-blue-300 space-y-1">
+              <p><strong>Email:</strong> demo@nodeai.com</p>
+              <p><strong>Password:</strong> demo123</p>
+            </div>
+            {isUsingMockClient && (
+              <p className="text-xs text-yellow-300 mt-2">
+                ⚠️ Running in demo mode (no Supabase connection)
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-8 text-slate-400 text-sm">
+          <p>© 2025 NodeAI. Advanced robotics fleet management platform.</p>
+        </div>
+      </div>
+    </div>
   );
 };
 
-export default MapLayer;
+export default LoginPage;
