@@ -3,8 +3,8 @@ import { useLoader } from '@react-three/fiber';
 import { TextureLoader } from 'three';
 import * as THREE from 'three';
 import type { Site } from '../../types';
-import { getSignedMapUrl } from '../lib/supabase';
-import { useAppStore } from '../store/useAppStore';
+import { getSignedMapUrl } from '../../lib/supabase';
+import { useAppStore } from '../../store/useAppStore';
 
 interface MapLayerProps {
   site: Site;
@@ -13,8 +13,6 @@ interface MapLayerProps {
 
 const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   const meshRef = useRef<THREE.Mesh>(null);
-import { getSignedMapUrl } from '../../lib/supabase';
-import { useAppStore } from '../../store/useAppStore';
   const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
   const [textureLoaded, setTextureLoaded] = useState(false);
   const { addEvent } = useAppStore();
