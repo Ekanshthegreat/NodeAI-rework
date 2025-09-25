@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { Site } from '../../types';
 import { getSignedMapUrl } from '../../lib/supabase';
 import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 
 interface MapLayerProps {
   site: Site;
@@ -21,11 +22,46 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   useEffect(() => {
     const resolveMapUrl = async () => {
       try {
+        if (site.map_url) {
+          const resolved = await getSignedMapUrl(site.map_url);
+          setMapUrlResolved(resolved);
+          
+          if (resolved) {
+            pushEvent({
+              ts: Date.now(),
+              level: 'INFO',
+              msg: `[DEMO] Map loaded: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
+            });
+          } else {
+            pushEvent({
+              ts: Date.now(),
+              level: 'WARN',
+              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url }
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to resolve map URL:', error);
+        setMapUrlResolved(null);
+        pushEvent({
+          ts: Date.now(),
+          level: 'WARN',
+          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
+          payload: { error, site_id: site.id, map_url: site.map_url }
+        });
       }
-      // Try to sign in first
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      }
-      )
+    };
+    
+    resolveMapUrl();
+  }, [site.map_url, site.id, site.name, pushEvent]);
+  
+  // Create texture
+  const texture = useMemo(() => {
+    if (!mapUrlResolved) {
+      // Create fallback grid texture
+      const canvas = document.createElement('canvas');
       canvas.width = 512;
       canvas.height = 512;
       const ctx = canvas.getContext('2d');
@@ -62,27 +98,14 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
         ctx.font = '14px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('Pharmacy', 140, 135);
-      }
-      if (signInData?.user) {
-        setUser(signInData.user);
-        toast.success(email === 'demo@nodeai.com' ? 'Demo account logged in successfully' : 'Logged in successfully');
+        ctx.fillText('Ward A', 350, 345);
+        ctx.fillText('Lab', 430, 135);
+        ctx.fillText(site.name, 256, 50);
       }
       
       const fallbackTexture = new THREE.CanvasTexture(canvas);
       fallbackTexture.wrapS = THREE.RepeatWrapping;
-      
-      // Provide helpful error messages
-      if (error.message?.includes('Invalid login credentials')) {
-        if (email === 'demo@nodeai.com') {
-          toast.error('Demo account login failed. Make sure password is: demo123');
-        } else {
-          toast.error('Invalid email or password');
-        }
-      } else if (error.message?.includes('Email not confirmed')) {
-        toast.error('Please check your email and confirm your account');
-      } else {
-        toast.error(error.message || 'Login failed');
-      }
+      fallbackTexture.wrapT = THREE.RepeatWrapping;
       setTextureLoaded(true);
       return fallbackTexture;
     }
@@ -141,39 +164,8 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
         <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
         <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
       </lineSegments>
-      if (signInError) {
-        }
-        // If login fails and it's a demo account, try to create it
-        if (email === 'demo@nodeai.com' && signInError.message.includes('Invalid login credentials')) {
-          console.log('Demo account not found, creating...');
-          
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: undefined, // Disable email confirmation
-            },
-          });
-
-          if (signUpError) {
-            if (signUpError.message.includes('already registered')) {
-              // Account exists but password is wrong
-              toast.error('Demo account exists but password is incorrect. Try: demo123');
-            } else {
-              throw signUpError;
-            }
-          } else if (signUpData.user) {
-            // Account created successfully
-            setUser(signUpData.user);
-            toast.success('Demo account created and logged in successfully');
-            navigate('/app');
-            return;
-          }
-        } else {
-          // Regular login error
-          throw signInError;
-        }
-  )
+    </group>
+  );
 };
 
 export default MapLayer;
