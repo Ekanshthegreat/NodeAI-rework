@@ -1,235 +1,171 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
-import { Bot, Lock, Mail } from 'lucide-react';
-import { useAppStore } from '../store/useAppStore';
-import { supabase, isUsingMockClient } from '../lib/supabase';
+import React, { useRef, useMemo, useEffect, useState } from 'react';
+import { useLoader } from '@react-three/fiber';
+import { TextureLoader } from 'three';
+import * as THREE from 'three';
+import type { Site } from '../../types';
+import { getSignedMapUrl } from '../../lib/supabase';
+import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 
-const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('exchawla@gmail.com');
-  const [password, setPassword] = useState('demo123');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
-  const navigate = useNavigate();
-  const setUser = useAppStore((state) => state.setUser);
+interface MapLayerProps {
+  site: Site;
+  visible?: boolean;
+}
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      // If using mock client, just set user and navigate
-      if (isUsingMockClient) {
-        const mockUser = { 
-          id: 'mock-user', 
-          email: email,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          email_confirmed_at: new Date().toISOString(),
-        };
-        setUser(mockUser as any);
-        toast.success('Welcome to NodeAI (Demo Mode)!');
-        navigate('/app');
-        return;
-      }
-
-      if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        
-        if (error) throw error;
-        
-        if (data.user) {
-          setUser(data.user);
-          toast.success('Account created! Welcome to NodeAI!');
-          navigate('/app');
-        }
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        
-        if (error) {
-          // If login fails and it's the demo account, try to create it first
-          if ((email === 'demo@nodeai.com' && password === 'demo123456') || 
-              (email === 'exchawla@gmail.com' && password === 'demo123')) {
-            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-              email,
-              password,
-              options: {
-                emailRedirectTo: undefined, // Disable email confirmation
-              }
+const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
+  const [textureLoaded, setTextureLoaded] = useState(false);
+  const { pushEvent } = useAppStore();
+  
+  // Resolve map URL
+  useEffect(() => {
+    const resolveMapUrl = async () => {
+      try {
+        if (site.map_url) {
+          const resolved = await getSignedMapUrl(site.map_url);
+          setMapUrlResolved(resolved);
+          
+          if (resolved) {
+            pushEvent({
+              ts: Date.now(),
+              level: 'INFO',
+              msg: `[DEMO] Map loaded: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
             });
-            
-            if (signUpError) throw signUpError;
-            
-            if (signUpData.user) {
-              setUser(signUpData.user);
-              toast.success('Demo account created! Welcome to NodeAI!');
-              navigate('/app');
-              return;
-            }
+          } else {
+            pushEvent({
+              ts: Date.now(),
+              level: 'WARN',
+              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url }
+            });
           }
-          throw error;
         }
-        
-        if (data.user) {
-          setUser(data.user);
-          toast.success('Welcome back to NodeAI!');
-          navigate('/app');
-        }
-      }
-    } catch (error: any) {
-      // Handle email not confirmed error for demo accounts
-      if (error.message.includes('Email not confirmed')) {
-        toast.error('Please disable email confirmation in Supabase settings for development');
-      } else {
-        console.error('Demo account creation failed:', error);
-        toast.error(error.message || (isSignUp ? 'Sign up failed' : 'Login failed'));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDemoLogin = async () => {
-    setIsLoading(true);
-    try {
-      const demoEmail = 'demo@nodeai.com';
-      const demoPassword = 'demo123456';
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: demoEmail,
-        password: demoPassword,
-      });
-      
-      if (error) {
-        // Try to create demo account if it doesn't exist
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: demoEmail,
-          password: demoPassword,
+      } catch (error) {
+        console.warn('Failed to resolve map URL:', error);
+        setMapUrlResolved(null);
+        pushEvent({
+          ts: Date.now(),
+          level: 'WARN',
+          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
+          payload: { error, site_id: site.id, map_url: site.map_url }
         });
+      }
+    };
+    
+    resolveMapUrl();
+  }, [site.map_url, site.id, site.name, pushEvent]);
+  
+  // Create texture
+  const texture = useMemo(() => {
+    if (!mapUrlResolved) {
+      // Create fallback grid texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        // Dark hospital floor
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, 512, 512);
         
-        if (signUpError) throw signUpError;
+        // Grid lines
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1;
         
-        if (signUpData.user) {
-          setUser(signUpData.user);
-          toast.success('Demo account created! Welcome to NodeAI!');
-          navigate('/app');
-          return;
+        for (let i = 0; i <= 512; i += 32) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, 512);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(0, i);
+          ctx.lineTo(512, i);
+          ctx.stroke();
         }
+        
+        // Hospital areas (simplified)
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(100, 100, 80, 60); // Pharmacy
+        ctx.fillRect(300, 300, 100, 80); // Ward A
+        ctx.fillRect(400, 100, 60, 60); // Lab
+        
+        // Labels
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Pharmacy', 140, 135);
+        ctx.fillText('Ward A', 350, 345);
+        ctx.fillText('Lab', 430, 135);
+        ctx.fillText(site.name, 256, 50);
       }
       
-      if (data.user) {
-        setUser(data.user);
-        toast.success('Welcome back to NodeAI!');
-        navigate('/app');
-      }
-    } catch (error: any) {
-      console.error('Demo login failed:', error);
-      toast.error('Demo login failed');
-    } finally {
-      setIsLoading(false);
+      const fallbackTexture = new THREE.CanvasTexture(canvas);
+      fallbackTexture.wrapS = THREE.RepeatWrapping;
+      fallbackTexture.wrapT = THREE.RepeatWrapping;
+      setTextureLoaded(true);
+      return fallbackTexture;
     }
-  };
-
+    
+    // Try to load actual map image
+    const loader = new TextureLoader();
+    const mapTexture = loader.load(
+      mapUrlResolved,
+      () => setTextureLoaded(true),
+      undefined,
+      (error) => {
+        console.warn('Failed to load map texture:', error);
+        setTextureLoaded(true);
+      }
+    );
+    
+    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
+    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
+    return mapTexture;
+  }, [mapUrlResolved, site.name]);
+  
+  // Calculate plane dimensions based on scale
+  const planeDimensions = useMemo(() => {
+    // Standard map size for consistent scaling
+    const mapWidth = 1024;
+    const mapHeight = 1024;
+    
+    // Convert pixels to meters using the site's scale
+    const worldWidth = mapWidth * site.scale_m_per_px;
+    const worldHeight = mapHeight * site.scale_m_per_px;
+    
+    return [worldWidth, worldHeight];
+  }, [site.scale_m_per_px]);
+  
+  if (!visible || !textureLoaded) return null;
+  
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-slate-900 rounded-lg shadow-xl p-8 border border-slate-800">
-          <div className="text-center mb-8">
-            <img 
-              src="/nodeai-logo.svg" 
-              alt="NodeAI" 
-              className="w-16 h-16 mx-auto mb-4"
-            />
-            <h1 className="text-2xl font-bold text-white mb-2">NodeAI</h1>
-            <p className="text-slate-400">
-              {isSignUp ? 'Create your account' : 'Robot Mission Orchestration'}
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter your password"
-                  required
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-500 text-white font-medium rounded-lg transition-colors duration-200 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800"
-            >
-              {isLoading 
-                ? (isSignUp ? 'Creating account...' : 'Signing in...') 
-                : (isSignUp ? 'Create Account' : 'Sign In')
-              }
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDemoLogin}
-              disabled={isLoading}
-              className="w-full py-2 px-4 bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium rounded-lg transition-colors duration-200 focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-800"
-            >
-              {isLoading ? 'Logging in...' : 'Use Demo Account'}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
-            >
-              {isSignUp 
-                ? 'Already have an account? Sign in' 
-                : "Don't have an account? Sign up"
-              }
-            </button>
-            
-            <p className="text-sm text-slate-400 mt-2">
-              Demo credentials: demo@nodeai.com / demo123456
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <group position={[site.origin.x, 0, site.origin.y]}>
+      <mesh
+        ref={meshRef}
+        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
+        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
+        receiveShadow
+      >
+        <planeGeometry args={planeDimensions} />
+        <meshStandardMaterial
+          map={texture}
+          transparent
+          opacity={0.9}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Optional: Add a subtle border */}
+      <lineSegments position={[0, 0.02, 0]}>
+        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
+        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
+      </lineSegments>
+    </group>
   );
 };
 
-export default LoginPage;
+export default MapLayer;

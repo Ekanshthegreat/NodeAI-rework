@@ -1,171 +1,108 @@
-import React, { useRef, useMemo, useEffect, useState } from 'react';
-import { useLoader } from '@react-three/fiber';
-import { TextureLoader } from 'three';
-import * as THREE from 'three';
-import type { Site } from '../../types';
-import { getSignedMapUrl } from '../../lib/supabase';
+import React from 'react';
+import { LogOut, Settings, Bot, Activity, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import { useAppStore } from '../../store/useAppStore';
+import { supabase, isUsingMockClient } from '../../lib/supabase';
 
-interface MapLayerProps {
-  site: Site;
-  visible?: boolean;
-}
+const Header: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, setUser, kpi, sidebarOpen, setSidebarOpen } = useAppStore();
 
-const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  
-  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
-  const [textureLoaded, setTextureLoaded] = useState(false);
-  const { pushEvent } = useAppStore();
-  
-  // Resolve map URL
-  useEffect(() => {
-    const resolveMapUrl = async () => {
-      try {
-        if (site.map_url) {
-          const resolved = await getSignedMapUrl(site.map_url);
-          setMapUrlResolved(resolved);
-          
-          if (resolved) {
-            pushEvent({
-              ts: Date.now(),
-              level: 'INFO',
-              msg: `[DEMO] Map loaded: ${site.name}`,
-              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
-            });
-          } else {
-            pushEvent({
-              ts: Date.now(),
-              level: 'WARN',
-              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
-              payload: { site_id: site.id, map_url: site.map_url }
-            });
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to resolve map URL:', error);
-        setMapUrlResolved(null);
-        pushEvent({
-          ts: Date.now(),
-          level: 'WARN',
-          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
-          payload: { error, site_id: site.id, map_url: site.map_url }
-        });
+  const handleLogout = async () => {
+    try {
+      if (!isUsingMockClient) {
+        await supabase.auth.signOut();
       }
-    };
-    
-    resolveMapUrl();
-  }, [site.map_url, site.id, site.name, pushEvent]);
-  
-  // Create texture
-  const texture = useMemo(() => {
-    if (!mapUrlResolved) {
-      // Create fallback grid texture
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-      
-      if (ctx) {
-        // Dark hospital floor
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(0, 0, 512, 512);
-        
-        // Grid lines
-        ctx.strokeStyle = '#475569';
-        ctx.lineWidth = 1;
-        
-        for (let i = 0; i <= 512; i += 32) {
-          ctx.beginPath();
-          ctx.moveTo(i, 0);
-          ctx.lineTo(i, 512);
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.moveTo(0, i);
-          ctx.lineTo(512, i);
-          ctx.stroke();
-        }
-        
-        // Hospital areas (simplified)
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(100, 100, 80, 60); // Pharmacy
-        ctx.fillRect(300, 300, 100, 80); // Ward A
-        ctx.fillRect(400, 100, 60, 60); // Lab
-        
-        // Labels
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Pharmacy', 140, 135);
-        ctx.fillText('Ward A', 350, 345);
-        ctx.fillText('Lab', 430, 135);
-        ctx.fillText(site.name, 256, 50);
-      }
-      
-      const fallbackTexture = new THREE.CanvasTexture(canvas);
-      fallbackTexture.wrapS = THREE.RepeatWrapping;
-      fallbackTexture.wrapT = THREE.RepeatWrapping;
-      setTextureLoaded(true);
-      return fallbackTexture;
+      setUser(null);
+      toast.success('Logged out successfully');
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Logout failed');
     }
-    
-    // Try to load actual map image
-    const loader = new TextureLoader();
-    const mapTexture = loader.load(
-      mapUrlResolved,
-      () => setTextureLoaded(true),
-      undefined,
-      (error) => {
-        console.warn('Failed to load map texture:', error);
-        setTextureLoaded(true);
-      }
-    );
-    
-    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
-    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
-    return mapTexture;
-  }, [mapUrlResolved, site.name]);
-  
-  // Calculate plane dimensions based on scale
-  const planeDimensions = useMemo(() => {
-    // Standard map size for consistent scaling
-    const mapWidth = 1024;
-    const mapHeight = 1024;
-    
-    // Convert pixels to meters using the site's scale
-    const worldWidth = mapWidth * site.scale_m_per_px;
-    const worldHeight = mapHeight * site.scale_m_per_px;
-    
-    return [worldWidth, worldHeight];
-  }, [site.scale_m_per_px]);
-  
-  if (!visible || !textureLoaded) return null;
-  
+  };
+
+  const isDemoMode = user?.email === 'demo@nodeai.com' || user?.email === 'exchawla@gmail.com' || isUsingMockClient;
+
+  // Safe KPI defaults
+  const safeKpi = {
+    replans_count: kpi?.replans_count ?? 0,
+    interventions_avoided: kpi?.interventions_avoided ?? 0,
+    mttr_ms_avg: kpi?.mttr_ms_avg ?? 5000,
+  };
+
   return (
-    <group position={[site.origin.x, 0, site.origin.y]}>
-      <mesh
-        ref={meshRef}
-        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
-        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
-        receiveShadow
-      >
-        <planeGeometry args={planeDimensions} />
-        <meshStandardMaterial
-          map={texture}
-          transparent
-          opacity={0.9}
-          depthWrite={false}
-        />
-      </mesh>
-      
-      {/* Optional: Add a subtle border */}
-      <lineSegments position={[0, 0.02, 0]}>
-        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
-        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
-      </lineSegments>
-    </group>
+    <header className="bg-slate-900 border-b border-slate-700 px-6 py-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+          
+          <div className="flex items-center space-x-3">
+            <Bot className="w-8 h-8 text-blue-400" />
+            <div>
+              <h1 className="text-xl font-bold text-white">NodeAI</h1>
+              <p className="text-sm text-slate-400">Robot Mission Orchestration</p>
+            </div>
+          </div>
+
+          {isDemoMode && (
+            <div className="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded-full">
+              Demo Mode
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center space-x-6">
+          {/* KPI Bar - Always Visible */}
+          <div className="flex items-center space-x-6 text-sm">
+            <div className="flex items-center space-x-2">
+              <Activity className="w-4 h-4 text-blue-400" />
+              <span className="text-slate-300">
+                Replans: <span className="text-white font-medium">{safeKpi.replans_count}</span>
+              </span>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="w-4 h-4 text-green-400" />
+              <span className="text-slate-300">
+                Interventions Saved: <span className="text-white font-medium">{safeKpi.interventions_avoided}</span>
+              </span>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="w-4 h-4 text-yellow-400" />
+              <span className="text-slate-300">
+                MTTR: <span className="text-white font-medium">
+                  {Math.max(1, Math.round(safeKpi.mttr_ms_avg / 1000))}s
+                </span>
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            <div className="text-right">
+              <p className="text-sm font-medium text-white">{user?.email}</p>
+              <p className="text-xs text-slate-400">Mission Control</p>
+            </div>
+            
+            <button
+              onClick={handleLogout}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
   );
 };
 
-export default MapLayer;
+export default Header;
