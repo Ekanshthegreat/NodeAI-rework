@@ -1,175 +1,197 @@
-import React, { useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { Bot, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { toast } from 'react-hot-toast';
-import { useAppStore } from '../store/useAppStore';
-import { supabase, isUsingMockClient } from '../lib/supabase';
+import React, { useRef, useMemo, useEffect, useState } from 'react';
+import { useLoader } from '@react-three/fiber';
+import { TextureLoader } from 'three';
+import * as THREE from 'three';
+import type { Site } from '../../types';
+import { getSignedMapUrl } from '../../lib/supabase';
+import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 
-const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('demo@nodeai.com');
-  const [password, setPassword] = useState('demo123');
-  const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const { isAuthenticated, setUser } = useAppStore();
+interface MapLayerProps {
+  site: Site;
+  visible?: boolean;
+}
 
-  if (isAuthenticated) {
-    return <Navigate to="/app" replace />;
-  }
+const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
+  const [textureLoaded, setTextureLoaded] = useState(false);
+  const { pushEvent } = useAppStore();
+  
+  // Resolve map URL
+  useEffect(() => {
+    const resolveMapUrl = async () => {
+      try {
+      // For demo accounts, try to sign up first if login fails
+      if (email === 'demo@nodeai.com') {
+        // First try to sign up the demo user
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: undefined, // Disable email confirmation
+          },
+        });
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+        // If signup succeeds, user is created and logged in
+        if (signUpData.user && !signUpError) {
+          setUser(signUpData.user);
+          toast.success('Demo account created and logged in!');
+          return;
+        }
 
-    try {
-      if (isUsingMockClient) {
-        // Mock login for demo
-        setUser({
-          id: 'demo-user',
-          email: email,
-          user_metadata: {},
-          app_metadata: {},
-          aud: 'authenticated',
-          created_at: new Date().toISOString(),
-        } as any);
-        toast.success('Demo login successful!');
-        return;
-      }
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-        options: {
-          emailRedirectTo: undefined, // Disable email confirmation for demo
-        },
-      });
-
-      if (error) {
-        if (error.message.includes('email_not_confirmed')) {
-          // Try to sign up instead for demo accounts
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        // If signup fails because user exists, try to sign in
+        if (signUpError && signUpError.message.includes('already registered')) {
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
             email,
             password,
             options: {
-              emailRedirectTo: undefined, // Disable email confirmation
+              emailRedirectTo: undefined,
             },
           });
 
-          if (signUpError) {
-            throw signUpError;
+          if (signInError) {
+            throw signInError;
           }
 
-          if (signUpData.user) {
-            setUser(signUpData.user);
-            toast.success('Demo account created and logged in!');
+          if (signInData.user) {
+            setUser(signInData.user);
+            toast.success('Demo login successful!');
             return;
           }
         }
-        throw error;
-      }
 
-      if (data.user) {
-        setUser(data.user);
-        toast.success('Login successful!');
+        // If signup failed for other reasons, throw the error
+        if (signUpError) {
+          throw signUpError;
+        }
+      } else {
+        // For non-demo accounts, use normal login flow
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+          options: {
+            emailRedirectTo: undefined,
+          },
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        if (data.user) {
+          setUser(data.user);
+          toast.success('Login successful!');
+        }
       }
-    } catch (error) {
-      console.error('Login error:', error);
-      toast.error((error as Error).message || 'Login failed');
-    } finally {
-      setIsLoading(false);
+  const texture = useMemo(() => {
+    if (!mapUrlResolved) {
+      // Create fallback grid texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        // Dark hospital floor
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Grid lines
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1;
+        
+        for (let i = 0; i <= 512; i += 32) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, 512);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(0, i);
+          ctx.lineTo(512, i);
+          ctx.stroke();
+        }
+        
+        // Hospital areas (simplified)
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(100, 100, 80, 60); // Pharmacy
+        ctx.fillRect(300, 300, 100, 80); // Ward A
+        ctx.fillRect(400, 100, 60, 60); // Lab
+        
+        // Labels
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Pharmacy', 140, 135);
+        ctx.fillText('Ward A', 350, 345);
+        ctx.fillText('Lab', 430, 135);
+        ctx.fillText(site.name, 256, 50);
+      }
+      
+      const fallbackTexture = new THREE.CanvasTexture(canvas);
+      fallbackTexture.wrapS = THREE.RepeatWrapping;
+      fallbackTexture.wrapT = THREE.RepeatWrapping;
+      setTextureLoaded(true);
+      return fallbackTexture;
     }
-  };
-
+    
+    // Try to load actual map image
+    const loader = new TextureLoader();
+    const mapTexture = loader.load(
+      mapUrlResolved,
+      () => setTextureLoaded(true),
+      undefined,
+      (error) => {
+        console.warn('Failed to load map texture:', error);
+        setTextureLoaded(true);
+      }
+    );
+    
+    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
+    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
+    return mapTexture;
+  }, [mapUrlResolved, site.name]);
+  
+  // Calculate plane dimensions based on scale
+  const planeDimensions = useMemo(() => {
+    // Standard map size for consistent scaling
+    const mapWidth = 1024;
+    const mapHeight = 1024;
+    
+    // Convert pixels to meters using the site's scale
+    const worldWidth = mapWidth * site.scale_m_per_px;
+    const worldHeight = mapHeight * site.scale_m_per_px;
+    
+    return [worldWidth, worldHeight];
+  }, [site.scale_m_per_px]);
+  
+  if (!visible || !textureLoaded) return null;
+  
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8 shadow-2xl">
-          {/* Logo and Title */}
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                <Bot className="w-6 h-6 text-blue-400" />
-              </div>
-            </div>
-            <h1 className="text-2xl font-bold text-white mb-2">NodeAI</h1>
-            <p className="text-slate-400">Robot Mission Orchestration</p>
-          </div>
-
-          {/* Demo Notice */}
-          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 mb-6">
-            <p className="text-green-400 text-sm text-center">
-              Demo Mode: Use <strong>demo@nodeai.com</strong> / <strong>demo123</strong>
-            </p>
-          </div>
-
-          {/* Login Form */}
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-12 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder="Enter your password"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-300 transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-blue-500 disabled:to-blue-600 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-[1.02] disabled:scale-100 shadow-lg"
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Signing in...</span>
-                </div>
-              ) : (
-                'Sign In'
-              )}
-            </button>
-          </form>
-
-          {/* Footer */}
-          <div className="mt-8 text-center">
-            <p className="text-slate-500 text-sm">
-              Secure robot fleet management platform
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <group position={[site.origin.x, 0, site.origin.y]}>
+      <mesh
+        ref={meshRef}
+        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
+        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
+        receiveShadow
+      >
+        <planeGeometry args={planeDimensions} />
+        <meshStandardMaterial
+          map={texture}
+          transparent
+          opacity={0.9}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Optional: Add a subtle border */}
+      <lineSegments position={[0, 0.02, 0]}>
+        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
+        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
+      </lineSegments>
+    </group>
   );
 };
 
-export default LoginPage;
+export default MapLayer;
