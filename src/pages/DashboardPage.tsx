@@ -165,7 +165,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
           depthWrite={false}
         />
       </mesh>
-      
+      >
       <div className="h-32 flex-shrink-0">
       <lineSegments position={[0, 0.02, 0]}>
         <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
