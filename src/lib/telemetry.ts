@@ -1,241 +1,149 @@
-import { useAppStore } from '../store/useAppStore';
-import { useSceneStore } from '../store/useSceneStore';
-import { TelemetryMessage } from './schemas';
-import { markRobotProgress, evaluatePoliciesOnTick } from './policy';
+import React, { useRef, useMemo, useEffect, useState } from 'react';
+import { useLoader } from '@react-three/fiber';
+import { TextureLoader } from 'three';
+import * as THREE from 'three';
+import type { Site } from '../../types';
+import { getSignedMapUrl } from '../../lib/supabase';
+import { useAppStore } from '../../store/useAppStore';
 
-const TELEM_PERIOD_MS = 2000;
-let lastPose = new Map<string, { x: number; y: number; ts: number }>();
-let stagnantCounts = new Map<string, number>();
-let robotPathProgress = new Map<string, { missionId: string; waypointIndex: number; startTime: number }>();
-
-export function startTelemetry(source: 'mock' | 'rmf' = 'mock') {
-  if (source === 'mock') {
-    startMockTelemetry();
-  }
-  // Future: add RMF WebSocket connection
+interface MapLayerProps {
+  site: Site;
+  visible?: boolean;
 }
 
-function startMockTelemetry() {
-  const interval = setInterval(() => {
-    const appState = useAppStore.getState();
-    const sceneState = useSceneStore.getState();
-    
-    try {
-      if (!appState.telemetryEnabled) return;
-
-      // Generate telemetry for each robot
-      appState.robots.forEach(robot => {
-        const fault = appState.faultInjected[robot.id];
-        const now = Date.now();
-        
-        // Apply fault injection
-        let pose = robot.pose;
-        let battery = robot.battery;
-        let status = robot.status;
-
-        // Blocked fault: freeze pose
-        if (fault?.blockedUntil && now < fault.blockedUntil) {
-          // Keep pose constant, but mark as BLOCKED
-          status = 'BLOCKED';
-        } else if (fault?.blockedUntil && now >= fault.blockedUntil) {
-          // Clear expired blocked fault
-          appState.setFault(robot.id, {});
-          status = 'IDLE';
-        }
-
-        // Battery drain fault
-        if (fault?.drained) {
-          battery = Math.min(0.15, battery);
-          // Auto-clear after 30 seconds
-          if (!fault.blockedUntil || now > (fault.blockedUntil || 0)) {
-            setTimeout(() => {
-              const currentFault = useAppStore.getState().faultInjected[robot.id];
-              if (currentFault?.drained) {
-                appState.setFault(robot.id, { ...currentFault, drained: false });
-              }
-            }, 30000);
-          }
-        }
-
-        // Path following or idle behavior
-        if (status !== 'BLOCKED' && !fault?.blockedUntil) {
-          // Check if robot is assigned to a mission with a path
-          const assignedMission = appState.missions.find(m => 
-            m.status === 'active' && 
-            appState.missionPlans[m.id]?.robot_selection.include.includes(robot.id)
-          );
-          
-          if (assignedMission && sceneState.missionPaths[assignedMission.id]) {
-            // Follow mission path deterministically
-            pose = followMissionPath(robot.id, assignedMission.id, sceneState, now);
-            status = 'ACTIVE';
-          } else {
-            // Idle in place with minor jitter (<0.05m)
-            const jitter = 0.02; // 2cm jitter
-            const time = now / 10000; // Slow jitter
-            pose = {
-              x: robot.pose.x + Math.sin(time + robot.id.charCodeAt(0)) * jitter,
-              y: robot.pose.y + Math.cos(time + robot.id.charCodeAt(0) * 0.7) * jitter,
-              theta: robot.pose.theta + Math.sin(time * 0.5) * 0.05, // Small rotation jitter
-            };
-            status = 'IDLE';
-            
-            // Idle battery drain: 0.1% per second
-            battery = Math.max(0, battery - (0.001 * TELEM_PERIOD_MS / 1000));
-          }
-        }
-
-        const telemetry: TelemetryMessage = {
-          type: 'telemetry',
-          ts: now,
-          robot_id: robot.id,
-          vendor: (robot.vendor as any) || 'mock',
-          pose,
-          vel: status === 'ACTIVE' ? Math.random() * 2 : 0,
-          battery,
-          status: status as any,
-          task_id: status === 'ACTIVE' ? `task-${robot.id}` : null,
-        };
-
-        onTelemetry(telemetry);
-      });
-    } catch (error) {
-      console.error('Telemetry error:', error);
-      // Log to event system
-      const appState = useAppStore.getState();
-      appState.pushEvent({
-        ts: Date.now(),
-        level: 'WARN',
-        msg: `[DEMO] Telemetry error: ${(error as Error).message}`,
-        payload: { error }
-      });
-    }
-  }, TELEM_PERIOD_MS);
-
-  return () => clearInterval(interval);
-}
-
-function followMissionPath(
-  robotId: string,
-  missionId: string,
-  sceneState: any,
-  now: number
-): { x: number; y: number; theta: number } {
-  const missionPath = sceneState.missionPaths[missionId];
-  if (!missionPath || !missionPath.waypoints.length) {
-    return { x: 0, y: 0, theta: 0 };
-  }
+const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
+  const [textureLoaded, setTextureLoaded] = useState(false);
   
-  const waypoints = missionPath.waypoints;
-  const speed = sceneState.pathSpeed || 0.6; // m/s
-  
-  // Get or initialize path progress
-  let progress = robotPathProgress.get(robotId);
-  if (!progress || progress.missionId !== missionId) {
-    progress = {
-      missionId,
-      waypointIndex: 0,
-      startTime: now,
+  // Resolve map URL
+  useEffect(() => {
+    const resolveMapUrl = async () => {
+      try {
+        if (site.map_url) {
+          const resolved = await getSignedMapUrl(site.map_url);
+          setMapUrlResolved(resolved);
+        }
+      } catch (error) {
+        console.warn('Failed to resolve map URL:', error);
+        setMapUrlResolved(null);
+      }
     };
-    robotPathProgress.set(robotId, progress);
-  }
-  
-  if (progress.waypointIndex >= waypoints.length - 1) {
-    // Mission complete
-    robotPathProgress.delete(robotId);
-    const appState = useAppStore.getState();
     
-    // Mark mission as completed
-    appState.setMissions(
-      appState.missions.map(m => 
-        m.id === missionId ? { ...m, status: 'completed' } : m
-      )
+    resolveMapUrl();
+  }, [site.map_url]);
+  
+  // Create texture
+  const texture = useMemo(() => {
+    if (!mapUrlResolved) {
+      // Create fallback grid texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        // Dark hospital floor
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Grid lines
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1;
+        
+        for (let i = 0; i <= 512; i += 32) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, 512);
+          ctx.stroke();
+          
+          ctx.beginPath();
+            // Active battery drain: 0.2% per second
+            battery = Math.max(0, battery - (0.002 * TELEM_PERIOD_MS / 1000));
+          ctx.moveTo(0, i);
+          ctx.lineTo(512, i);
+          ctx.stroke();
+        }
+        
+        // Hospital areas (simplified)
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(100, 100, 80, 60); // Pharmacy
+        ctx.fillRect(300, 300, 100, 80); // Ward A
+        ctx.fillRect(400, 100, 60, 60); // Lab
+        
+        // Labels
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Pharmacy', 140, 135);
+        ctx.fillText('Ward A', 350, 345);
+        ctx.fillText('Lab', 430, 135);
+        ctx.fillText(site.name, 256, 50);
+      }
+      
+      const fallbackTexture = new THREE.CanvasTexture(canvas);
+      fallbackTexture.wrapS = THREE.RepeatWrapping;
+        msg: `[DEMO] Telemetry error: ${(error as Error).message}`,
+      setTextureLoaded(true);
+      return fallbackTexture;
+    }
+    
+    // Try to load actual map image
+    const loader = new TextureLoader();
+    const mapTexture = loader.load(
+      mapUrlResolved,
+      () => setTextureLoaded(true),
+      undefined,
+      (error) => {
+        console.warn('Failed to load map texture:', error);
+        setTextureLoaded(true);
+      }
     );
     
-    // Log completion event
-    appState.addEvent({
-      id: `event-${Date.now()}`,
-      mission_id: missionId,
-      robot_id: robotId,
-      type: 'mission_completed',
-      payload: { message: `Mission ${missionId} completed by ${robotId}` },
-      ts: new Date().toISOString(),
-    });
+    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
+    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
+    return mapTexture;
+  }, [mapUrlResolved, site.name]);
+  
+  // Calculate plane dimensions based on scale
+  const planeDimensions = useMemo(() => {
+    // Standard map size for consistent scaling
+    const mapWidth = 1024;
+    const mapHeight = 1024;
     
-    return waypoints[waypoints.length - 1];
-  }
-  
-  const currentWaypoint = waypoints[progress.waypointIndex];
-  const nextWaypoint = waypoints[progress.waypointIndex + 1];
-  
-  if (!nextWaypoint) {
-    return currentWaypoint;
-  }
-  
-  // Calculate progress along current segment
-  const segmentDistance = Math.sqrt(
-    Math.pow(nextWaypoint.x - currentWaypoint.x, 2) +
-    Math.pow(nextWaypoint.y - currentWaypoint.y, 2)
-  );
-  
-  const segmentDuration = (segmentDistance / speed) * 1000; // ms
-  const segmentProgress = Math.min(1, (now - progress.startTime) / segmentDuration);
-  
-  if (segmentProgress >= 1) {
-    // Move to next waypoint
-    progress.waypointIndex++;
-    progress.startTime = now;
-    robotPathProgress.set(robotId, progress);
-    return nextWaypoint;
-  }
-  
-  // Interpolate between waypoints
-  const x = currentWaypoint.x + (nextWaypoint.x - currentWaypoint.x) * segmentProgress;
-  const y = currentWaypoint.y + (nextWaypoint.y - currentWaypoint.y) * segmentProgress;
-  const theta = Math.atan2(nextWaypoint.y - currentWaypoint.y, nextWaypoint.x - currentWaypoint.x);
-  
-  return { x, y, theta };
-}
-
-function onTelemetry(msg: TelemetryMessage) {
-  const s = useAppStore.getState();
-  s.addTelemetry(msg);
-
-  // Update robot state in store
-  s.setRobots(
-    s.robots.map(robot =>
-      robot.id === msg.robot_id
-        ? {
-            ...robot,
-            pose: msg.pose,
-            battery: msg.battery,
-            status: msg.status,
-            updated_at: new Date(msg.ts).toISOString(),
-          }
-        : robot
-    )
-  );
-
-  // Progress detection for ACTIVE robots
-  if (msg.status === 'ACTIVE') {
-    const prev = lastPose.get(msg.robot_id);
-    const dist = prev ? Math.hypot(msg.pose.x - prev.x, msg.pose.y - prev.y) : 999;
-    const epsilon = 0.02; // 2 cm
-    const count = stagnantCounts.get(msg.robot_id) ?? 0;
+    // Convert pixels to meters using the site's scale
+    const worldWidth = mapWidth * site.scale_m_per_px;
+    const worldHeight = mapHeight * site.scale_m_per_px;
     
-    if (prev && dist < epsilon) {
-      stagnantCounts.set(msg.robot_id, count + 1);
-    } else {
-      stagnantCounts.set(msg.robot_id, 0);
-    }
-
-    const stagnantForMs = (stagnantCounts.get(msg.robot_id)! * TELEM_PERIOD_MS);
-    const isStuck = stagnantForMs > 3000; // 3s pre-flag; policy uses 10s threshold
-    markRobotProgress(msg.robot_id, !isStuck, msg.ts);
-  }
+    return [worldWidth, worldHeight];
+  }, [site.scale_m_per_px]);
   
-  lastPose.set(msg.robot_id, { x: msg.pose.x, y: msg.pose.y, ts: msg.ts });
+  if (!visible || !textureLoaded) return null;
+  
+  return (
+    <group position={[site.origin.x, 0, site.origin.y]}>
+      <mesh
+        ref={meshRef}
+        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
+        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
+        receiveShadow
+      >
+        <planeGeometry args={planeDimensions} />
+        <meshStandardMaterial
+          map={texture}
+          transparent
+          opacity={0.9}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Optional: Add a subtle border */}
+      <lineSegments position={[0, 0.02, 0]}>
+        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
+        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
+      </lineSegments>
+    </group>
+  );
+};
 
-  // Run policy evaluation
-  evaluatePoliciesOnTick(msg.ts);
-}
+export default MapLayer;

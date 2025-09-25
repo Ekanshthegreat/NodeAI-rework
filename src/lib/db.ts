@@ -1,313 +1,177 @@
-import { supabase } from './supabase';
-import type { MissionPlan } from './schemas';
+import React, { useRef, useMemo, useEffect, useState } from 'react';
+import { useLoader } from '@react-three/fiber';
+import { TextureLoader } from 'three';
+    ], { onConflict: 'id' })
+import type { Site } from '../../types';
+import { getSignedMapUrl } from '../../lib/supabase';
+import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 
-export async function saveMissionPlan(missionId: string, plan: MissionPlan): Promise<void> {
-  const { error } = await supabase
-    .from('mission_plans')
-    .upsert({
-      mission_id: missionId,
-      plan_json: plan,
-      validated: true,
-    });
-
-  if (error) {
-    throw new Error(`Failed to save mission plan: ${error.message}`);
-  }
+interface MapLayerProps {
+  console.log('[DEMO] Database seeded successfully:', {
+  visible?: boolean;
 }
 
-export async function getMissionPlan(missionId: string): Promise<MissionPlan | null> {
-  const { data, error } = await supabase
-    .from('mission_plans')
-    .select('plan_json')
-    .eq('mission_id', missionId)
-    .single();
-
-  if (error) {
-    if (error.code === 'PGRST116') return null; // Not found
-    throw new Error(`Failed to get mission plan: ${error.message}`);
-  }
-
-  return data?.plan_json as MissionPlan;
-}
-
-export async function recordReplan(
-  missionId: string,
-  reason: string,
-  oldPlan: MissionPlan,
-  newPlan: MissionPlan
-): Promise<void> {
-  const { error } = await supabase
-    .from('replans')
-    .insert({
-      mission_id: missionId,
-      reason,
-      old_plan: oldPlan,
-      new_plan: newPlan,
-    });
-
-  if (error) {
-    throw new Error(`Failed to record replan: ${error.message}`);
-  }
-}
-
-export async function getReplanHistory(missionId: string): Promise<Array<{
-  id: string;
-  reason: string;
-  old_plan: MissionPlan;
-  new_plan: MissionPlan;
-  ts: string;
-}>> {
-  const { data, error } = await supabase
-    .from('replans')
-    .select('*')
-    .eq('mission_id', missionId)
-    .order('ts', { ascending: false });
-
-  if (error) {
-    throw new Error(`Failed to get replan history: ${error.message}`);
-  }
-
-  return data || [];
-}
-
-export async function fetchSites() {
-  try {
-    const { data, error } = await supabase
-      .from('sites')
-      .select('*')
-      .order('created_at');
-
-    if (error) {
-      throw new Error(`Failed to fetch sites: ${error.message}`);
-    }
-
-    return data || [];
-  } catch (error) {
-    console.warn('Using mock sites data');
-    return getMockSites();
-  }
-}
-
-export async function fetchRobots(siteId?: string) {
-  try {
-    let query = supabase
-      .from('robots')
-      .select('*')
-      .order('id');
-
-    if (siteId) {
-      query = query.eq('site_id', siteId);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      throw new Error(`Failed to fetch robots: ${error.message}`);
-    }
-
-    return data || [];
-  } catch (error) {
-    console.warn('Using mock robots data');
-    return getMockRobots(siteId);
-  }
-}
-
-export async function fetchMissions(siteId?: string) {
-  try {
-    let query = supabase
-      .from('missions')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (siteId) {
-      query = query.eq('site_id', siteId);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      throw new Error(`Failed to fetch missions: ${error.message}`);
-    }
-
-    return data || [];
-  } catch (error) {
-    console.warn('Using mock missions data');
-    return getMockMissions(siteId);
-  }
-}
-
-// Mock data fallbacks
-function getMockSites() {
-  return [
-    {
-      id: 'HospitalA-F2',
-      name: 'Hospital Alpha - Floor 2',
-      map_url: '/maps/hospital-f2.png',
-      origin: { x: 0, y: 0 },
-      scale_m_per_px: 0.05,
-      created_at: new Date().toISOString(),
-    }
-  ];
-}
-
-function getMockRobots(siteId?: string) {
-  const robots = [
-    {
-      id: 'MED-001',
-      site_id: 'HospitalA-F2',
-      vendor: 'rmf',
-      pose: { x: 2.5, y: 1.0, theta: 0.0 },
-      battery: 0.85,
-      status: 'IDLE',
-      capabilities: ['delivery', 'dock'],
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: 'MED-002',
-      site_id: 'HospitalA-F2',
-      vendor: 'vda5050',
-      pose: { x: -1.5, y: 3.2, theta: 1.57 },
-      battery: 0.42,
-      status: 'CHARGING',
-      capabilities: ['delivery', 'dock'],
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: 'MED-003',
-      site_id: 'HospitalA-F2',
-      vendor: 'mock',
-      pose: { x: 4.0, y: -2.1, theta: -0.78 },
-      battery: 0.67,
-      status: 'ACTIVE',
-      capabilities: ['delivery', 'dock', 'elevator'],
-      updated_at: new Date().toISOString(),
-    },
-  ];
-
-  return siteId ? robots.filter(r => r.site_id === siteId) : robots;
-}
-
-function getMockMissions(siteId?: string) {
-  const missions = [
-    {
-      id: 'mission-001',
-      site_id: 'HospitalA-F2',
-      nl: 'Deliver medication from pharmacy to room 205',
-      status: 'active',
-      created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-    },
-    {
-      id: 'mission-002',
-      site_id: 'HospitalA-F2',
-      nl: 'Transport lab samples from room 210 to laboratory',
-      status: 'completed',
-      created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    },
-    {
-      id: 'mission-003',
-      site_id: 'HospitalA-F2',
-      nl: 'Perform security patrol of all patient rooms',
-      status: 'planning',
-      created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    },
-  ];
-
-  return siteId ? missions.filter(m => m.site_id === siteId) : missions;
-}
-
-export async function seedIfEmpty(): Promise<void> {
-  try {
-    // Check if we already have data
-    const { data: sites } = await supabase.from('sites').select('id').limit(1);
+const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
+  const [textureLoaded, setTextureLoaded] = useState(false);
+  const { pushEvent } = useAppStore();
+  
+  // Resolve map URL
+  useEffect(() => {
+    const resolveMapUrl = async () => {
+      try {
+        if (site.map_url) {
+          const resolved = await getSignedMapUrl(site.map_url);
+          setMapUrlResolved(resolved);
+          
+          if (resolved) {
+            pushEvent({
+              ts: Date.now(),
+              level: 'INFO',
+              msg: `[DEMO] Map loaded: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
+            });
+          } else {
+            pushEvent({
+              ts: Date.now(),
+              level: 'WARN',
+              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url }
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to resolve map URL:', error);
+        setMapUrlResolved(null);
+        pushEvent({
+          ts: Date.now(),
+          level: 'WARN',
+          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
+          payload: { error, site_id: site.id, map_url: site.map_url }
+        });
+      }
+    };
     
-    if (sites && sites.length > 0) {
-      return; // Already seeded
-    }
-  } catch (error) {
-    console.warn('Supabase not available, using mock data');
-    return; // Skip seeding if Supabase is not available
-  }
+    resolveMapUrl();
+  }, [site.map_url, site.id, site.name, pushEvent]);
+  
+  // Create texture
+  const texture = useMemo(() => {
+    if (!mapUrlResolved) {
+      // Create fallback grid texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        // Dark hospital floor
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Grid lines
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1;
+        
+        for (let i = 0; i <= 512; i += 32) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, 512);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(0, i);
+          ctx.lineTo(512, i);
+          ctx.stroke();
+        }
+        
+        // Hospital areas (simplified)
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(100, 100, 80, 60); // Pharmacy
+        ctx.fillRect(300, 300, 100, 80); // Ward A
+        ctx.fillRect(400, 100, 60, 60); // Lab
+        
+        // Labels
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Pharmacy', 140, 135);
+        ctx.fillText('Ward A', 350, 345);
+        ctx.fillText('Lab', 430, 135);
+        ctx.fillText(site.name, 256, 50);
+      }
+      
+      const fallbackTexture = new THREE.CanvasTexture(canvas);
+      fallbackTexture.wrapS = THREE.RepeatWrapping;
+      fallbackTexture.wrapT = THREE.RepeatWrapping;
+    .upsert({
+      setTextureLoaded(true);
+    // Always reseed for demo reset functionality
+      map_url: 'hospital.png', // Relative path for Supabase storage
+    // if (sites && sites.length > 0) {
+    // }
+    
+    // Try to load actual map image
+    const loader = new TextureLoader();
+    const mapTexture = loader.load(
+      mapUrlResolved,
+      () => setTextureLoaded(true),
+      undefined,
+      (error) => {
+        console.warn('Failed to load map texture:', error);
+    .upsert([
+        setTextureLoaded(true);
+    );
+    
+    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
+    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
+    return mapTexture;
+  }, [mapUrlResolved, site.name]);
+  
+  // Calculate plane dimensions based on scale
+  const planeDimensions = useMemo(() => {
+    // Standard map size for consistent scaling
+    const mapWidth = 1024;
+    const mapHeight = 1024;
+    
+    // Convert pixels to meters using the site's scale
+    const worldWidth = mapWidth * site.scale_m_per_px;
+    const worldHeight = mapHeight * site.scale_m_per_px;
+    
+    return [worldWidth, worldHeight];
+  }, [site.scale_m_per_px]);
+  
+  if (!visible || !textureLoaded) return null;
+  
+  return (
+    ], { onConflict: 'id' });
+    <group position={[site.origin.x, 0, site.origin.y]}>
+        ref={meshRef}
+        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
+        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
+        receiveShadow
+      >
+        <planeGeometry args={planeDimensions} />
+        <meshStandardMaterial
+    .upsert([
+          map={texture}
+          opacity={0.9}
+        id: 'demo-mission-001',
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Optional: Add a subtle border */}
+      <lineSegments position={[0, 0.02, 0]}>
+        id: 'demo-mission-002',
+        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
+        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
+      </lineSegments>
+    </group>
+  );
+  console.log('[DEMO] Seeding database with initial data...');
+        id: 'demo-mission-003',
 
-  console.log('Seeding database with initial data...');
-
-  // Insert demo site
-  const { error: siteError } = await supabase
-    .from('sites')
-    .insert({
-      id: 'HospitalA-F2',
-      name: 'Hospital Alpha - Floor 2',
-      map_url: '/maps/hospital-f2.png',
-      origin: { x: 0, y: 0 },
-      scale_m_per_px: 0.05,
-    });
-
-  if (siteError) {
-    throw new Error(`Failed to seed site: ${siteError.message}`);
-  }
-
-  // Insert demo robots
-  const { error: robotsError } = await supabase
-    .from('robots')
-    .insert([
-      {
-        id: 'MED-001',
-        site_id: 'HospitalA-F2',
-        vendor: 'rmf',
-        pose: { x: 2.5, y: 1.0, theta: 0.0 },
-        battery: 0.85,
-        status: 'IDLE',
-      },
-      {
-        id: 'MED-002',
-        site_id: 'HospitalA-F2',
-        vendor: 'vda5050',
-        pose: { x: -1.5, y: 3.2, theta: 1.57 },
-        battery: 0.42,
-        status: 'CHARGING',
-      },
-      {
-        id: 'MED-003',
-        site_id: 'HospitalA-F2',
-        vendor: 'mock',
-        pose: { x: 4.0, y: -2.1, theta: -0.78 },
-        battery: 0.67,
-        status: 'ACTIVE',
-      },
-    ]);
-
-  if (robotsError) {
-    throw new Error(`Failed to seed robots: ${robotsError.message}`);
-  }
-
-  // Insert sample missions
-  const { data: missions, error: missionsError } = await supabase
-    .from('missions')
-    .insert([
-      {
-        site_id: 'HospitalA-F2',
-        nl: 'Deliver medication from pharmacy to room 205',
-        status: 'active',
-      },
-      {
-        site_id: 'HospitalA-F2',
-        nl: 'Transport lab samples from room 210 to laboratory',
-        status: 'completed',
-      },
-      {
-        site_id: 'HospitalA-F2',
-        nl: 'Perform security patrol of all patient rooms',
-        status: 'planning',
-      },
-    ])
-    .select();
-
-  if (missionsError) {
-    throw new Error(`Failed to seed missions: ${missionsError.message}`);
-  }
-
-  console.log('Database seeded successfully:', {
-    sites: 1,
-    robots: 3,
-    missions: missions?.length || 0
-  });
-}
+export default MapLayer;

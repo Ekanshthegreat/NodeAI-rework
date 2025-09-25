@@ -4,6 +4,7 @@ import { TextureLoader } from 'three';
 import * as THREE from 'three';
 import type { Site } from '../../types';
 import { getSignedMapUrl } from '../../lib/supabase';
+import { useAppStore } from '../../store/useAppStore';
 
 interface MapLayerProps {
   site: Site;
@@ -14,6 +15,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
   const [textureLoaded, setTextureLoaded] = useState(false);
+  const { pushEvent } = useAppStore();
   
   // Resolve map URL
   useEffect(() => {
@@ -22,15 +24,37 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
         if (site.map_url) {
           const resolved = await getSignedMapUrl(site.map_url);
           setMapUrlResolved(resolved);
+          
+          if (resolved) {
+            pushEvent({
+              ts: Date.now(),
+              level: 'INFO',
+              msg: `[DEMO] Map loaded: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
+            });
+          } else {
+            pushEvent({
+              ts: Date.now(),
+              level: 'WARN',
+              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url }
+            });
+          }
         }
       } catch (error) {
         console.warn('Failed to resolve map URL:', error);
         setMapUrlResolved(null);
+        pushEvent({
+          ts: Date.now(),
+          level: 'WARN',
+          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
+          payload: { error, site_id: site.id, map_url: site.map_url }
+        });
       }
     };
     
     resolveMapUrl();
-  }, [site.map_url]);
+  }, [site.map_url, site.id, site.name, pushEvent]);
   
   // Create texture
   const texture = useMemo(() => {

@@ -1,265 +1,171 @@
-import React, { useState } from 'react';
-import { Settings, Zap, Battery, Square, RotateCcw, AlertTriangle, Shield, ShieldOff, Gauge } from 'lucide-react';
-import { toast } from 'react-hot-toast';
-import { useAppStore } from '../store/useAppStore';
-import { useSceneStore } from '../store/useSceneStore';
+import React, { useRef, useMemo, useEffect, useState } from 'react';
+import { useLoader } from '@react-three/fiber';
+import { TextureLoader } from 'three';
+import * as THREE from 'three';
+import type { Site } from '../../types';
+import { getSignedMapUrl } from '../../lib/supabase';
+import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 
-const DevPanel: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const { 
-    selectedRobot, 
-    robots, 
-    policy, 
-    setPolicy, 
-    faultInjected, 
-    setFault, 
-    pushEvent 
-  } = useAppStore();
-  const { pathSpeed, setPathSpeed } = useSceneStore();
+interface MapLayerProps {
+  site: Site;
+  visible?: boolean;
+}
 
-  // Only show in development with feature flag
-  if (import.meta.env.VITE_SHOW_DEV_PANEL !== 'true') {
-    return null;
-  }
-
-  const selectedRobotData = robots.find(r => r.id === selectedRobot);
-  const hasFault = selectedRobot ? faultInjected[selectedRobot] : null;
-
-  const handleInjectBlocked = () => {
-    if (!selectedRobot) {
-      toast.error('Please select a robot first');
-      return;
-    }
-
-    const now = Date.now();
-    setFault(selectedRobot, { blockedUntil: now + 10000 }); // 10 seconds
-
-    pushEvent({
-      ts: now,
-      level: 'WARN',
-      msg: `Fault injected: BLOCKED on ${selectedRobot} for 10s`,
-      payload: { action: 'fault_injected', fault_type: 'BLOCKED', robot_id: selectedRobot, duration: 10 },
-    });
-
-    toast.success(`Injected BLOCKED fault on ${selectedRobot} for 10s`);
-  };
-
-  const handleDrainBattery = () => {
-    if (!selectedRobot) {
-      toast.error('Please select a robot first');
-      return;
-    }
-
-    const now = Date.now();
-    setFault(selectedRobot, { drained: true });
-
-    pushEvent({
-      ts: now,
-      level: 'WARN',
-      msg: `Fault injected: LOW_BATTERY on ${selectedRobot} (15%)`,
-      payload: { action: 'fault_injected', fault_type: 'LOW_BATTERY', robot_id: selectedRobot, battery: 0.15 },
-    });
-
-    toast.success(`Drained battery on ${selectedRobot} to 15%`);
-  };
-
-  const handleEmitTestEvent = () => {
-    pushEvent({
-      ts: Date.now(),
-      level: 'INFO',
-      msg: 'Test event emitted from Dev Panel',
-      payload: { action: 'test_event' },
-    });
-    toast.success('Test event emitted');
-  };
-
-  const handleResetData = async () => {
-    try {
-      // This would clear and reseed data in a real implementation
-      toast.success('Data reset (mock)');
+const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
+                  <span>Reset Demo</span>
+  const { pushEvent } = useAppStore();
+  
+  // Resolve map URL
+  useEffect(() => {
+    const resolveMapUrl = async () => {
+      try {
+        if (site.map_url) {
+          const resolved = await getSignedMapUrl(site.map_url);
+          setMapUrlResolved(resolved);
+          
+          if (resolved) {
+            pushEvent({
+              ts: Date.now(),
+              level: 'INFO',
+              msg: `[DEMO] Map loaded: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
+            });
+          } else {
+            pushEvent({
+              ts: Date.now(),
+              level: 'WARN',
+              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url }
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to resolve map URL:', error);
+        setMapUrlResolved(null);
+        pushEvent({
+          ts: Date.now(),
+          level: 'WARN',
+          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
+          payload: { error, site_id: site.id, map_url: site.map_url }
+        });
+      }
+    };
+    
+    resolveMapUrl();
+  }, [site.map_url, site.id, site.name, pushEvent]);
+  
+  // Create texture
+  const texture = useMemo(() => {
+    if (!mapUrlResolved) {
+      // Create fallback grid texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
       
-      pushEvent({
-        ts: Date.now(),
-        level: 'INFO',
-        msg: 'Data reset completed',
-        payload: { action: 'data_reset' },
-      });
-    } catch (error) {
-      toast.error('Failed to reset data');
+      if (ctx) {
+        // Dark hospital floor
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Grid lines
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1;
+        
+        for (let i = 0; i <= 512; i += 32) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, 512);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(0, i);
+          ctx.lineTo(512, i);
+          ctx.stroke();
+        }
+        
+        // Hospital areas (simplified)
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(100, 100, 80, 60); // Pharmacy
+        ctx.fillRect(300, 300, 100, 80); // Ward A
+        ctx.fillRect(400, 100, 60, 60); // Lab
+        
+        // Labels
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Pharmacy', 140, 135);
+        ctx.fillText('Ward A', 350, 345);
+        ctx.fillText('Lab', 430, 135);
+        ctx.fillText(site.name, 256, 50);
+      }
+      
+      const fallbackTexture = new THREE.CanvasTexture(canvas);
+      fallbackTexture.wrapS = THREE.RepeatWrapping;
+      fallbackTexture.wrapT = THREE.RepeatWrapping;
+      setTextureLoaded(true);
+      return fallbackTexture;
     }
-  };
-
+    
+    // Try to load actual map image
+    const loader = new TextureLoader();
+    const mapTexture = loader.load(
+      mapUrlResolved,
+      () => setTextureLoaded(true),
+      undefined,
+      (error) => {
+        console.warn('Failed to load map texture:', error);
+        setTextureLoaded(true);
+      }
+    );
+    
+    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
+    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
+    return mapTexture;
+  }, [mapUrlResolved, site.name]);
+  
+  // Calculate plane dimensions based on scale
+  const planeDimensions = useMemo(() => {
+    // Standard map size for consistent scaling
+    const mapWidth = 1024;
+    const mapHeight = 1024;
+    
+    // Convert pixels to meters using the site's scale
+    const worldWidth = mapWidth * site.scale_m_per_px;
+    const worldHeight = mapHeight * site.scale_m_per_px;
+    
+    return [worldWidth, worldHeight];
+  }, [site.scale_m_per_px]);
+  
+  if (!visible || !textureLoaded) return null;
+  
   return (
-    <>
-      {/* Floating button */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 p-3 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg transition-colors z-50"
-        title="Dev Panel"
+    <group position={[site.origin.x, 0, site.origin.y]}>
+      <mesh
+        ref={meshRef}
+        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
+        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
+        receiveShadow
       >
-        <Settings className="w-5 h-5" />
-      </button>
-
-      {/* Panel modal */}
-      {isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-900 rounded-lg border border-slate-700 p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-white">Dev Panel</h2>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1 hover:bg-slate-800 rounded transition-colors"
-              >
-                <Settings className="w-4 h-4 text-slate-400" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {/* Self-healing toggle */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  {policy.selfHealEnabled ? (
-                    <Shield className="w-4 h-4 text-green-400" />
-                  ) : (
-                    <ShieldOff className="w-4 h-4 text-red-400" />
-                  )}
-                  <span className="text-slate-300">Self-Healing</span>
-                </div>
-                <button
-                  onClick={() => setPolicy({ selfHealEnabled: !policy.selfHealEnabled })}
-                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                    policy.selfHealEnabled
-                      ? 'bg-green-600 hover:bg-green-700 text-white'
-                      : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                  }`}
-                >
-                  {policy.selfHealEnabled ? 'ON' : 'OFF'}
-                </button>
-              </div>
-
-              {/* Selected robot info */}
-              <div className="p-3 bg-slate-800 rounded border border-slate-600">
-                <div className="text-sm text-slate-400 mb-1">Selected Robot:</div>
-                <div className="text-white font-mono">
-                  {selectedRobot || 'None'}
-                  {selectedRobotData && (
-                    <span className="text-slate-400 ml-2">
-                      ({Math.round(selectedRobotData.battery * 100)}%, {selectedRobotData.status})
-                    </span>
-                  )}
-                </div>
-                {hasFault && (
-                  <div className="text-orange-400 text-sm mt-1 flex items-center">
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    Fault: {hasFault.blockedUntil ? 'BLOCKED' : hasFault.drained ? 'LOW_BATTERY' : 'None'}
-                  </div>
-                )}
-              </div>
-
-              {/* Fault injection buttons */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-slate-300">Fault Injection</h3>
-                
-                <button
-                  onClick={handleInjectBlocked}
-                  disabled={!selectedRobot || !!hasFault?.blockedUntil}
-                  className="w-full flex items-center justify-center space-x-2 py-2 px-4 bg-red-600 hover:bg-red-700 disabled:bg-red-500 disabled:opacity-50 text-white rounded transition-colors"
-                >
-                  <Square className="w-4 h-4" />
-                  <span>Inject BLOCKED (10s)</span>
-                </button>
-
-                <button
-                  onClick={handleDrainBattery}
-                  disabled={!selectedRobot || !!hasFault?.drained}
-                  className="w-full flex items-center justify-center space-x-2 py-2 px-4 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-500 disabled:opacity-50 text-white rounded transition-colors"
-                >
-                  <Battery className="w-4 h-4" />
-                  <span>Drain Battery (15%)</span>
-                </button>
-              </div>
-
-              {/* Utility buttons */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-slate-300">Utilities</h3>
-                
-                <button
-                  onClick={handleEmitTestEvent}
-                  className="w-full flex items-center justify-center space-x-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-                >
-                  <Zap className="w-4 h-4" />
-                  <span>Emit Test Event</span>
-                </button>
-
-                <button
-                  onClick={handleResetData}
-                  className="w-full flex items-center justify-center space-x-2 py-2 px-4 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  <span>Reset Seed Data</span>
-                </button>
-              </div>
-              
-              {/* Path Speed Control */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-slate-300">Path Speed</h3>
-                
-                <div className="space-y-2">
-                  <label className="block text-xs text-slate-400">
-                    Speed: {pathSpeed.toFixed(1)} m/s
-                  </label>
-                  <input
-                    type="range"
-                    min="0.2"
-                    max="1.2"
-                    step="0.1"
-                    value={pathSpeed}
-                    onChange={(e) => setPathSpeed(parseFloat(e.target.value))}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-              
-              {/* Policy Configuration */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-slate-300">Policy Settings</h3>
-                
-                <div className="space-y-2">
-                  <label className="block text-xs text-slate-400">
-                    Min Battery Threshold: {Math.round(policy.defaultMinBatteryPct * 100)}%
-                  </label>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="0.5"
-                    step="0.05"
-                    value={policy.defaultMinBatteryPct}
-                    onChange={(e) => setPolicy({ defaultMinBatteryPct: parseFloat(e.target.value) })}
-                    className="w-full"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="block text-xs text-slate-400">
-                    Blocked Timeout: {policy.defaultBlockedSeconds}s
-                  </label>
-                  <input
-                    type="range"
-                    min="5"
-                    max="30"
-                    step="5"
-                    value={policy.defaultBlockedSeconds}
-                    onChange={(e) => setPolicy({ defaultBlockedSeconds: parseInt(e.target.value) })}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+        <planeGeometry args={planeDimensions} />
+        <meshStandardMaterial
+          map={texture}
+          transparent
+          opacity={0.9}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Optional: Add a subtle border */}
+      <lineSegments position={[0, 0.02, 0]}>
+        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
+        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
+      </lineSegments>
+    </group>
   );
 };
 
-export default DevPanel;
+export default MapLayer;

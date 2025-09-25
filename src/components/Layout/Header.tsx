@@ -1,146 +1,175 @@
-import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Bot, Menu, LogOut, Play, Wifi, WifiOff, Activity, AlertTriangle } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import React, { useRef, useMemo, useEffect, useState } from 'react';
+import { useLoader } from '@react-three/fiber';
+import { TextureLoader } from 'three';
+import * as THREE from 'three';
+import type { Site } from '../../types';
+import { getSignedMapUrl } from '../../lib/supabase';
 import { useAppStore } from '../../store/useAppStore';
-import { supabase } from '../../lib/supabase';
+import { useAppStore } from '../../store/useAppStore';
 
-const Header: React.FC = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { user, setUser, toggleSidebar, isRealtimeConnected, robots, missions, kpi } = useAppStore();
+interface MapLayerProps {
+  site: Site;
+  visible?: boolean;
+}
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-      toast.success('Logged out successfully');
-      navigate('/login');
-    } catch (error) {
-      toast.error('Error logging out');
-    }
-  };
-
-  const isReplayPage = location.pathname === '/app/replay';
-  const activeRobots = robots.filter(r => r.status === 'ACTIVE').length;
-  const activeMissions = missions.filter(m => m.status === 'active').length;
-  const errorRobots = robots.filter(r => r.status === 'ERROR').length;
-
-  return (
-    <header className="bg-slate-950/95 backdrop-blur-sm border-b border-slate-800/50 px-4 py-3 flex items-center justify-between shadow-lg">
-      <div className="flex items-center space-x-4">
-        <button
-          onClick={toggleSidebar}
-          className="p-2 hover:bg-slate-800/50 rounded-lg transition-all duration-200 hover:scale-105"
-        >
-          <Menu className="w-4 h-4 text-slate-400" />
-        </button>
+const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+            <span className="text-xs font-medium text-green-300">Demo Mode</span>
+          </div>
+        )}
         
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <Bot className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-white tracking-tight">NodeAI</h1>
-            <p className="text-xs text-slate-400 -mt-1">Mission Control</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center space-x-6">
-        {/* KPI Strip */}
-        <div className="flex items-center space-x-4 text-xs text-slate-400">
-          <div className="flex items-center space-x-1">
-            <span className="text-slate-500">Replans:</span>
-            <span className="text-slate-300 font-mono">{kpi.replans_count || 0}</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <span className="text-slate-500">Interventions:</span>
-            <span className="text-green-400 font-mono">{kpi.interventions_avoided || 0}</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <span className="text-slate-500">MTTR:</span>
-            <span className="text-blue-400 font-mono">{Math.max(1, Math.round((kpi.mttr_ms_avg || 0) / 1000))}s</span>
-          </div>
-        </div>
-        
-        {/* System Status */}
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/50">
-            {isRealtimeConnected ? (
-              <Wifi className="w-4 h-4 text-green-400" />
-            ) : (
-              <WifiOff className="w-4 h-4 text-red-400" />
-            )}
-            <span className="text-xs font-medium text-slate-300">
-              {isRealtimeConnected ? 'LIVE' : 'OFFLINE'}
-            </span>
-          </div>
+  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
+  const [textureLoaded, setTextureLoaded] = useState(false);
+  const { pushEvent } = useAppStore();
+  
+  // Resolve map URL
+  useEffect(() => {
+    const resolveMapUrl = async () => {
+      try {
+        if (site.map_url) {
+          const resolved = await getSignedMapUrl(site.map_url);
+          setMapUrlResolved(resolved);
           
-          <div className="flex items-center space-x-3 text-xs">
-            <div className="flex items-center space-x-1">
-              <Activity className="w-3 h-3 text-green-400" />
-              <span className="text-slate-300 font-mono">{activeRobots}</span>
-              <span className="text-slate-500">active</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <div className="w-2 h-2 bg-blue-400 rounded-full" />
-              <span className="text-slate-300 font-mono">{activeMissions}</span>
-              <span className="text-slate-500">missions</span>
-            </div>
-            {errorRobots > 0 && (
-              <div className="flex items-center space-x-1">
-                <AlertTriangle className="w-3 h-3 text-red-400" />
-                <span className="text-red-300 font-mono">{errorRobots}</span>
-                <span className="text-slate-500">errors</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Navigation */}
-        {!isReplayPage && (
-          <button
-            onClick={() => navigate('/app/replay')}
-            className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg text-slate-400 hover:text-slate-300 text-sm transition-all duration-200 border border-slate-700/50 hover:border-slate-600/50"
-          >
-            <Play className="w-4 h-4" />
-            <span>Replay</span>
-          </button>
-        )}
-
-        {isReplayPage && (
-          <button
-            onClick={() => navigate('/app')}
-            className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg text-slate-400 hover:text-slate-300 text-sm transition-all duration-200 border border-slate-700/50 hover:border-slate-600/50"
-          >
-            <Bot className="w-4 h-4" />
-            <span>Live</span>
-          </button>
-        )}
-
-        {/* User Menu */}
-        <div className="flex items-center space-x-3">
-          <div className="text-right">
-            <div className="text-sm font-medium text-slate-300">{user?.email?.split('@')[0]}</div>
-            <div className="text-xs text-slate-500">Administrator</div>
-          </div>
-          <div className="w-8 h-8 bg-gradient-to-br from-slate-600 to-slate-700 rounded-full flex items-center justify-center">
-            <span className="text-xs font-bold text-white">
-              {user?.email?.charAt(0).toUpperCase()}
-            </span>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="p-2 hover:bg-slate-800/50 rounded-lg transition-all duration-200 hover:scale-105"
-            title="Logout"
-          >
-            <LogOut className="w-4 h-4 text-slate-400 hover:text-red-400" />
-          </button>
-        </div>
-      </div>
-    </header>
+          if (resolved) {
+            pushEvent({
+              ts: Date.now(),
+              level: 'INFO',
+              msg: `[DEMO] Map loaded: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
+            });
+          } else {
+            pushEvent({
+              ts: Date.now(),
+              level: 'WARN',
+              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url }
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to resolve map URL:', error);
+        setMapUrlResolved(null);
+        pushEvent({
+          ts: Date.now(),
+          level: 'WARN',
+          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
+          payload: { error, site_id: site.id, map_url: site.map_url }
+        });
+      }
+    };
+    
+    resolveMapUrl();
+  }, [site.map_url, site.id, site.name, pushEvent]);
+  
+  // Create texture
+  const texture = useMemo(() => {
+    if (!mapUrlResolved) {
+      // Create fallback grid texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        // Dark hospital floor
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Grid lines
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1;
+        
+        for (let i = 0; i <= 512; i += 32) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, 512);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(0, i);
+          ctx.lineTo(512, i);
+          ctx.stroke();
+        }
+        
+        // Hospital areas (simplified)
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(100, 100, 80, 60); // Pharmacy
+        ctx.fillRect(300, 300, 100, 80); // Ward A
+        ctx.fillRect(400, 100, 60, 60); // Lab
+        
+        // Labels
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Pharmacy', 140, 135);
+        ctx.fillText('Ward A', 350, 345);
+        ctx.fillText('Lab', 430, 135);
+        ctx.fillText(site.name, 256, 50);
+      }
+      
+      const fallbackTexture = new THREE.CanvasTexture(canvas);
+      fallbackTexture.wrapS = THREE.RepeatWrapping;
+      fallbackTexture.wrapT = THREE.RepeatWrapping;
+      setTextureLoaded(true);
+      return fallbackTexture;
+    }
+    
+    // Try to load actual map image
+    const loader = new TextureLoader();
+    const mapTexture = loader.load(
+      mapUrlResolved,
+      () => setTextureLoaded(true),
+      undefined,
+      (error) => {
+        console.warn('Failed to load map texture:', error);
+        setTextureLoaded(true);
+      }
+    );
+    
+    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
+    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
+    return mapTexture;
+  }, [mapUrlResolved, site.name]);
+  
+  // Calculate plane dimensions based on scale
+  const planeDimensions = useMemo(() => {
+    // Standard map size for consistent scaling
+    const mapWidth = 1024;
+    const mapHeight = 1024;
+    
+    // Convert pixels to meters using the site's scale
+    const worldWidth = mapWidth * site.scale_m_per_px;
+    const worldHeight = mapHeight * site.scale_m_per_px;
+    
+    return [worldWidth, worldHeight];
+  }, [site.scale_m_per_px]);
+  
+  if (!visible || !textureLoaded) return null;
+  
+  return (
+    <group position={[site.origin.x, 0, site.origin.y]}>
+      <mesh
+        ref={meshRef}
+        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
+        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
+        receiveShadow
+      >
+        <planeGeometry args={planeDimensions} />
+        <meshStandardMaterial
+          map={texture}
+          transparent
+          opacity={0.9}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Optional: Add a subtle border */}
+      <lineSegments position={[0, 0.02, 0]}>
+        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
+        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
+      </lineSegments>
+    </group>
   );
 };
 
-export default Header;
+export default MapLayer;
