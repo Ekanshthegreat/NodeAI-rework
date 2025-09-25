@@ -22,6 +22,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   useEffect(() => {
     const resolveMapUrl = async () => {
       try {
+      }
       // For demo accounts, try to sign up first if login fails
       if (email === 'demo@nodeai.com') {
         // First try to sign up the demo user
@@ -84,6 +85,9 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
           toast.success('Login successful!');
         }
       }
+    }
+  }
+  )
   const texture = useMemo(() => {
     if (!mapUrlResolved) {
       // Create fallback grid texture
