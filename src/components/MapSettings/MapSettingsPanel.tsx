@@ -13,6 +13,11 @@ interface MapLayerProps {
 
 const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   const meshRef = useRef<THREE.Mesh>(null);
+    // Check for supported image formats
+    const supportedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
+    if (!supportedTypes.includes(file.type.toLowerCase())) {
+      toast.error('Please select a supported image format (PNG, JPEG, WebP, or GIF)');
+    }
   const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
   const [textureLoaded, setTextureLoaded] = useState(false);
   const { addEvent } = useAppStore();
