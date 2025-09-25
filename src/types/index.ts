@@ -5,14 +5,13 @@ import * as THREE from 'three';
 import type { Site } from '../../types';
 import { getSignedMapUrl } from '../../lib/supabase';
 import { useAppStore } from '../../store/useAppStore';
-import { useAppStore } from '../../store/useAppStore';
 
 interface MapLayerProps {
   site: Site;
   visible?: boolean;
 }
 
-const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
+interface Robot {
   robot_id: string;
   pose: {
     x: number;
@@ -43,6 +42,8 @@ export interface KPI {
   batteryAverage: number;
   uptime: number;
 }
+
+const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
   const [textureLoaded, setTextureLoaded] = useState(false);
