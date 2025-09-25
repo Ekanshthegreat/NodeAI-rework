@@ -1,156 +1,176 @@
-import { MissionPlan } from './schemas';
-import { nanoid } from 'nanoid';
-import { useAppStore } from '../store/useAppStore';
-import { toast } from 'react-hot-toast';
+import React, { useRef, useMemo, useEffect, useState } from 'react';
+import { useLoader } from '@react-three/fiber';
+import { TextureLoader } from 'three';
+import * as THREE from 'three';
+import type { Site } from '../../types';
+import { getSignedMapUrl } from '../../lib/supabase';
+import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 
-// In-memory helper to track when a robot became stuck
-const stuckMap = new Map<string, number>(); // robotId -> ts when stuck began
-
-export function markRobotProgress(robotId: string, progressing: boolean, now: number) {
-  if (progressing) {
-    stuckMap.delete(robotId);
-  } else if (!stuckMap.has(robotId)) {
-    stuckMap.set(robotId, now);
-  }
+interface MapLayerProps {
+  site: Site;
+  visible?: boolean;
 }
 
-export function evaluatePoliciesOnTick(now: number) {
-  const s = useAppStore.getState();
-  if (!s.policy.selfHealEnabled) return;
-
-  // For each active mission with a plan, check the current assigned/selected robot
-  Object.entries(s.missionPlans).forEach(([mission_id, plan]) => {
-    const mission = s.missions.find(m => m.id === mission_id);
-    if (!mission || mission.status !== 'active') return;
-
-    const robots = s.robots.filter(r => r.site_id === plan.site_id);
-    const selectedId = plan.robot_selection.include[0] ?? null;
-    const selected = robots.find(r => r.id === selectedId);
-
-    if (!selected) return;
-
-    // Battery policy
-    if (selected.battery < plan.constraints.min_battery_pct) {
-      const newPlan = replanForLowBattery(plan, robots);
-      if (newPlan) {
-        applyReplan(mission_id, plan, newPlan, 'LOW_BATTERY', now);
-        return;
-      }
-    }
-
-    // Blocked policy: detect stuck pose based on stuckSince tracker
-    const stuckSince = stuckMap.get(selected.id) ?? 0;
-    if (stuckSince > 0) {
-      const blockedS = s.policy.defaultBlockedSeconds;
-      if (now - stuckSince >= blockedS * 1000) {
-        const newPlan = reassignOnBlocked(plan, robots);
-        if (newPlan) {
-          applyReplan(mission_id, plan, newPlan, 'BLOCKED', now);
-        }
-      }
-    }
-  });
+const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
+  const stuckSince = stuckMap.get(robotId);
+  if (!stuckSince) return 0;
+  return Math.floor((now - stuckSince) / 1000); // Return duration in seconds
 }
 
-// Replan strategies
-function pickReplacement(
-  robots: Array<{
-    id: string;
-    battery: number;
-    status: string;
-    capabilities?: string[];
-  }>,
-  min: number,
-  requiredPlugins: string[]
-) {
-  return (
-    robots
-      .filter(
-        r =>
-          (r.status === 'IDLE' || r.status === 'ACTIVE') &&
-          r.battery >= min &&
-          requiredPlugins.every(p =>
-            (r.capabilities ?? ['delivery', 'dock']).includes(p)
-          )
-      )
-      .sort((a, b) => b.battery - a.battery)[0] ?? null
-  );
-}
-
-function reassignOnBlocked(plan: MissionPlan, robots: any[]): MissionPlan | null {
-  const required = ['delivery'];
-  const replacement = pickReplacement(robots, plan.constraints.min_battery_pct, required);
-  if (!replacement) return null;
-
-  return {
-    ...plan,
-    robot_selection: { ...plan.robot_selection, include: [replacement.id] },
-  };
-}
-
-function replanForLowBattery(plan: MissionPlan, robots: any[]): MissionPlan | null {
-  const required = ['delivery', 'dock'];
-  const replacement = pickReplacement(robots, plan.constraints.min_battery_pct, required);
-  if (!replacement) return null;
-
-  return {
-    ...plan,
-    subtasks: [
-      {
-        id: nanoid(),
-        verb: 'charge',
-        args: {
-          from: null,
-          to: null,
-          item: null,
-          room: null,
-          zone: null,
-          dock: 'dock-1',
-        },
-        policy: { reassign_on_blocked_s: 10, retry_limit: 1 },
-      },
-      ...plan.subtasks.slice(1),
-    ],
-    robot_selection: { ...plan.robot_selection, include: [replacement.id] },
-  };
-}
-
-function applyReplan(
-  mission_id: string,
-  oldPlan: MissionPlan,
-  newPlan: MissionPlan,
-  reason: 'LOW_BATTERY' | 'BLOCKED',
-  now: number
-) {
-  const s = useAppStore.getState();
-  s.setMissionPlan(mission_id, newPlan);
-
-  // KPI updates
-  const recoveryMs = 5000; // placeholder until we track exact start/end of fault
-  s.bumpKPI({
-    replans_count: s.kpi.replans_count + 1,
-    interventions_avoided: s.kpi.interventions_avoided + 1,
-    mttr_ms_avg:
-      s.kpi.mttr_ms_avg === 0
-        ? recoveryMs
-        : Math.round((s.kpi.mttr_ms_avg + recoveryMs) / 2),
-  });
-
-  // Event log + toast
-  const oldRobotId = oldPlan.robot_selection.include[0];
-  const newRobotId = newPlan.robot_selection.include[0];
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
+  const [textureLoaded, setTextureLoaded] = useState(false);
+  const { pushEvent } = useAppStore();
   
-  s.pushEvent({
-    ts: now,
-    level: 'INFO',
-    msg: `Auto-replan: ${reason} → ${oldRobotId} → ${newRobotId}`,
-    payload: { reason, mission_id, from_robot: oldRobotId, to_robot: newRobotId, before: oldPlan, after: newPlan },
-  });
+  // Resolve map URL
+  useEffect(() => {
+    const resolveMapUrl = async () => {
+      try {
+        if (site.map_url) {
+          const resolved = await getSignedMapUrl(site.map_url);
+          setMapUrlResolved(resolved);
+          
+          if (resolved) {
+            pushEvent({
+              ts: Date.now(),
+              level: 'INFO',
+              msg: `[DEMO] Map loaded: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
+            });
+          } else {
+            pushEvent({
+              ts: Date.now(),
+              level: 'WARN',
+              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url }
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to resolve map URL:', error);
+        setMapUrlResolved(null);
+        pushEvent({
+          ts: Date.now(),
+          level: 'WARN',
+          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
+          payload: { error, site_id: site.id, map_url: site.map_url }
+        });
+      }
+    };
+    
+    resolveMapUrl();
+  }, [site.map_url, site.id, site.name, pushEvent]);
+  
+  // Create texture
+  const texture = useMemo(() => {
+    if (!mapUrlResolved) {
+      // Create fallback grid texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        // Dark hospital floor
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Grid lines
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1;
+        
+        for (let i = 0; i <= 512; i += 32) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, 512);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(0, i);
+          ctx.lineTo(512, i);
+          ctx.stroke();
+        }
+        
+        // Hospital areas (simplified)
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(100, 100, 80, 60); // Pharmacy
+        ctx.fillRect(300, 300, 100, 80); // Ward A
+        ctx.fillRect(400, 100, 60, 60); // Lab
+        
+        // Labels
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Pharmacy', 140, 135);
+        ctx.fillText('Ward A', 350, 345);
+        ctx.fillText('Lab', 430, 135);
+        ctx.fillText(site.name, 256, 50);
+      }
+      
+      const fallbackTexture = new THREE.CanvasTexture(canvas);
+      fallbackTexture.wrapS = THREE.RepeatWrapping;
+      fallbackTexture.wrapT = THREE.RepeatWrapping;
+      setTextureLoaded(true);
+      return fallbackTexture;
+    }
+    
+    // Try to load actual map image
+    const loader = new TextureLoader();
+    const mapTexture = loader.load(
+      mapUrlResolved,
+      () => setTextureLoaded(true),
+      undefined,
+      (error) => {
+        console.warn('Failed to load map texture:', error);
+        setTextureLoaded(true);
+      }
+    );
+    
+    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
+    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
+    return mapTexture;
+  }, [mapUrlResolved, site.name]);
+  
+  // Calculate plane dimensions based on scale
+  const planeDimensions = useMemo(() => {
+    // Standard map size for consistent scaling
+    const mapWidth = 1024;
+    const mapHeight = 1024;
+    
+    // Convert pixels to meters using the site's scale
+    const worldWidth = mapWidth * site.scale_m_per_px;
+    const worldHeight = mapHeight * site.scale_m_per_px;
+    
+    return [worldWidth, worldHeight];
+  }, [site.scale_m_per_px]);
+  
+  if (!visible || !textureLoaded) return null;
+  
+  return (
+    <group position={[site.origin.x, 0, site.origin.y]}>
+      <mesh
+        ref={meshRef}
+        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
+        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
+        receiveShadow
+      >
+        <planeGeometry args={planeDimensions} />
+        <meshStandardMaterial
+          map={texture}
+          transparent
+          opacity={0.9}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Optional: Add a subtle border */}
+      <lineSegments position={[0, 0.02, 0]}>
+        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
+        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
+      </lineSegments>
+    </group>
+  );
+};
 
-  toast.success(`Mission auto-replanned: ${reason} → ${newRobotId}`);
-
-  // Clear stuck state for old robot
-  if (oldRobotId) {
-    stuckMap.delete(oldRobotId);
-  }
-}
+export default MapLayer;
