@@ -3,7 +3,7 @@ import { useLoader } from '@react-three/fiber';
 import { TextureLoader } from 'three';
 import * as THREE from 'three';
 import type { Site } from '../../types';
-import { getSignedMapUrl } from '../../lib/supabase';
+import { getSignedMapUrl } from '../lib/supabase';
 import { useAppStore } from '../../store/useAppStore';
 
 interface MapLayerProps {
