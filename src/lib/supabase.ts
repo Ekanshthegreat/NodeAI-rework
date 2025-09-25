@@ -12,8 +12,6 @@ interface MapLayerProps {
 }
 
 const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
-  }
-  
   const meshRef = useRef<THREE.Mesh>(null);
   const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
   const [textureLoaded, setTextureLoaded] = useState(false);
@@ -63,12 +61,17 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
           ctx.moveTo(0, i);
           ctx.lineTo(512, i);
           ctx.stroke();
+        }
+        
+        // Room outlines
+        ctx.fillStyle = '#374151';
+        ctx.fillRect(100, 100, 80, 60); // Pharmacy
         ctx.fillRect(300, 300, 100, 80); // Ward A
         ctx.fillRect(400, 100, 60, 60); // Lab
-    const bucket = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'maps';
+        
         // Labels
-      .from(bucket)
-      .createSignedUrl(mapUrl, 3600); // 1 hour expiry
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '14px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('Pharmacy', 140, 135);
         ctx.fillText('Ward A', 350, 345);
