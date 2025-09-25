@@ -14,10 +14,7 @@ interface MapLayerProps {
 
 const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   const meshRef = useRef<THREE.Mesh>(null);
-            <span className="text-xs font-medium text-green-300">Demo Mode</span>
-          </div>
-        )}
-        
+  
   const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
   const [textureLoaded, setTextureLoaded] = useState(false);
   const { pushEvent } = useAppStore();
