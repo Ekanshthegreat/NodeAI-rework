@@ -5,7 +5,6 @@ import * as THREE from 'three';
 import type { Site } from '../../types';
 import { getSignedMapUrl } from '../../lib/supabase';
 import { useAppStore } from '../../store/useAppStore';
-import { useAppStore } from '../../store/useAppStore';
 
 interface MapLayerProps {
   site: Site;
@@ -13,11 +12,6 @@ interface MapLayerProps {
 }
 
 const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
-  const stuckSince = stuckMap.get(robotId);
-  if (!stuckSince) return 0;
-  return Math.floor((now - stuckSince) / 1000); // Return duration in seconds
-}
-
   const meshRef = useRef<THREE.Mesh>(null);
   const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
   const [textureLoaded, setTextureLoaded] = useState(false);
