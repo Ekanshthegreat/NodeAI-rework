@@ -22,72 +22,42 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   useEffect(() => {
     const resolveMapUrl = async () => {
       try {
-      }
-      // For demo accounts, try to sign up first if login fails
-      if (email === 'demo@nodeai.com') {
-        // First try to sign up the demo user
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: undefined, // Disable email confirmation
-          },
-        });
-
-        // If signup succeeds, user is created and logged in
-        if (signUpData.user && !signUpError) {
-          setUser(signUpData.user);
-          toast.success('Demo account created and logged in!');
-          return;
-        }
-
-        // If signup fails because user exists, try to sign in
-        if (signUpError && signUpError.message.includes('already registered')) {
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-            options: {
-              emailRedirectTo: undefined,
-            },
-          });
-
-          if (signInError) {
-            throw signInError;
-          }
-
-          if (signInData.user) {
-            setUser(signInData.user);
-            toast.success('Demo login successful!');
-            return;
+        if (site.map_url) {
+          const resolved = await getSignedMapUrl(site.map_url);
+          setMapUrlResolved(resolved);
+          
+          if (resolved) {
+            pushEvent({
+              ts: Date.now(),
+              level: 'INFO',
+              msg: `[DEMO] Map loaded: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
+            });
+          } else {
+            pushEvent({
+              ts: Date.now(),
+              level: 'WARN',
+              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url }
+            });
           }
         }
-
-        // If signup failed for other reasons, throw the error
-        if (signUpError) {
-          throw signUpError;
-        }
-      } else {
-        // For non-demo accounts, use normal login flow
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-          options: {
-            emailRedirectTo: undefined,
-          },
+      } catch (error) {
+        console.warn('Failed to resolve map URL:', error);
+        setMapUrlResolved(null);
+        pushEvent({
+          ts: Date.now(),
+          level: 'WARN',
+          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
+          payload: { error, site_id: site.id, map_url: site.map_url }
         });
-
-        if (error) {
-          throw error;
-        }
-
-        if (data.user) {
-          setUser(data.user);
-          toast.success('Login successful!');
-        }
       }
-    }
-  }
-  )
+    };
+    
+    resolveMapUrl();
+  }, [site.map_url, site.id, site.name, pushEvent]);
+  
+  // Create texture
   const texture = useMemo(() => {
     if (!mapUrlResolved) {
       // Create fallback grid texture
