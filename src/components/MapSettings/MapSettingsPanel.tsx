@@ -1,175 +1,304 @@
-import React, { useRef, useMemo, useEffect, useState } from 'react';
-import { useLoader } from '@react-three/fiber';
-import { TextureLoader } from 'three';
-import * as THREE from 'three';
-import type { Site } from '../../types';
-import { getSignedMapUrl } from '../lib/supabase';
-import { useAppStore } from '../store/useAppStore';
+import React, { useState } from 'react';
+import { Dialog } from '@headlessui/react';
+import { X, Upload, Save, RotateCcw } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { useAppStore } from '../../store/useAppStore';
+import { uploadMapImage, upsertSite } from '../../lib/supabase';
+import MapCalibrationCanvas from './MapCalibrationCanvas';
+import { calculateScale, validateCalibration } from '../../utils/coordinates';
 
-interface MapLayerProps {
-  site: Site;
-  visible?: boolean;
+interface MapSettingsPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
+const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({ isOpen, onClose }) => {
+  const { sites, currentSite, setSites } = useAppStore();
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  
+  // Calibration state
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [calibrationPoints, setCalibrationPoints] = useState<Array<[number, number]>>([]);
+  const [calibrationDistance, setCalibrationDistance] = useState<number | null>(null);
+  const [origin, setOrigin] = useState<[number, number] | null>(null);
+
+  const currentSiteData = sites.find(site => site.id === currentSite);
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
     // Check for supported image formats
     const supportedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
     if (!supportedTypes.includes(file.type.toLowerCase())) {
       toast.error('Please select a supported image format (PNG, JPEG, WebP, or GIF)');
+      return;
     }
-  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
-  const [textureLoaded, setTextureLoaded] = useState(false);
-  const { addEvent } = useAppStore();
-  
-  // Resolve map URL
-  useEffect(() => {
-    const resolveMapUrl = async () => {
-      try {
-        if (site.map_url) {
-          const resolved = await getSignedMapUrl(site.map_url);
-          setMapUrlResolved(resolved);
-          
-          if (resolved) {
-            addEvent({
-              ts: Date.now(),
-              level: 'INFO',
-              msg: `[DEMO] Map loaded: ${site.name}`,
-              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
-            });
-          } else {
-            addEvent({
-              ts: Date.now(),
-              level: 'WARN',
-              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
-              payload: { site_id: site.id, map_url: site.map_url }
-            });
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to resolve map URL:', error);
-        setMapUrlResolved(null);
-        addEvent({
-          ts: Date.now(),
-          level: 'WARN',
-          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
-          payload: { error, site_id: site.id, map_url: site.map_url }
+
+    // Check file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size must be less than 10MB');
+      return;
+    }
+
+    setSelectedFile(file);
+    
+    // Create preview URL
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    
+    // Reset calibration state
+    setCalibrationPoints([]);
+    setCalibrationDistance(null);
+    setOrigin(null);
+    setIsCalibrating(false);
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile || !currentSite) return;
+
+    setUploading(true);
+    try {
+      const mapUrl = await uploadMapImage(selectedFile, currentSite);
+      toast.success('Map uploaded successfully!');
+      
+      // Update site with new map URL
+      if (currentSiteData) {
+        const updatedSite = await upsertSite({
+          ...currentSiteData,
+          map_url: mapUrl,
         });
+        
+        setSites(sites.map(site => 
+          site.id === currentSite ? updatedSite : site
+        ));
       }
-    };
-    
-    resolveMapUrl();
-  }, [site.map_url, site.id, site.name, addEvent]);
-  
-  // Create texture
-  const texture = useMemo(() => {
-    if (!mapUrlResolved) {
-      // Create fallback grid texture
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d');
       
-      if (ctx) {
-        // Dark hospital floor
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(0, 0, 512, 512);
-        
-        // Grid lines
-        ctx.strokeStyle = '#475569';
-        ctx.lineWidth = 1;
-        
-        for (let i = 0; i <= 512; i += 32) {
-          ctx.beginPath();
-          ctx.moveTo(i, 0);
-          ctx.lineTo(i, 512);
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.moveTo(0, i);
-          ctx.lineTo(512, i);
-          ctx.stroke();
+      setSelectedFile(null);
+      setPreviewUrl(null);
+    } catch (error) {
+      console.error('Upload error:', error);
+      
+      if (error instanceof Error) {
+        if (error.message.includes('mime type') && error.message.includes('not supported')) {
+          toast.error('File format not supported. Please use PNG, JPEG, WebP, or GIF.');
+        } else if (error.message.includes('row-level security policy')) {
+          toast.error('Permission denied. Please check your authentication or contact support.');
+        } else {
+          toast.error(`Upload failed: ${error.message}`);
         }
-        
-        // Hospital areas (simplified)
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(100, 100, 80, 60); // Pharmacy
-        ctx.fillRect(300, 300, 100, 80); // Ward A
-        ctx.fillRect(400, 100, 60, 60); // Lab
-        
-        // Labels
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Pharmacy', 140, 135);
-        ctx.fillText('Ward A', 350, 345);
-        ctx.fillText('Lab', 430, 135);
-        ctx.fillText(site.name, 256, 50);
+      } else {
+        toast.error('Upload failed. Please try again.');
       }
-      
-      const fallbackTexture = new THREE.CanvasTexture(canvas);
-      fallbackTexture.wrapS = THREE.RepeatWrapping;
-      fallbackTexture.wrapT = THREE.RepeatWrapping;
-      setTextureLoaded(true);
-      return fallbackTexture;
+    } finally {
+      setUploading(false);
     }
-    
-    // Try to load actual map image
-    const loader = new TextureLoader();
-    const mapTexture = loader.load(
-      mapUrlResolved,
-      () => setTextureLoaded(true),
-      undefined,
-      (error) => {
-        console.warn('Failed to load map texture:', error);
-        setTextureLoaded(true);
-      }
-    );
-    
-    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
-    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
-    return mapTexture;
-  }, [mapUrlResolved, site.name]);
-  
-  // Calculate plane dimensions based on scale
-  const planeDimensions = useMemo(() => {
-    // Standard map size for consistent scaling
-    const mapWidth = 1024;
-    const mapHeight = 1024;
-    
-    // Convert pixels to meters using the site's scale
-    const worldWidth = mapWidth * site.scale_m_per_px;
-    const worldHeight = mapHeight * site.scale_m_per_px;
-    
-    return [worldWidth, worldHeight];
-  }, [site.scale_m_per_px]);
-  
-  if (!visible || !textureLoaded) return null;
-  
-  return (
-    <group position={[site.origin.x, 0, site.origin.y]}>
-      <mesh
-        ref={meshRef}
-        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
-        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
-        receiveShadow
-      >
-        <planeGeometry args={planeDimensions} />
-        <meshStandardMaterial
-          map={texture}
-          transparent
-          opacity={0.9}
-          depthWrite={false}
-        />
-      </mesh>
+  };
+
+  const startCalibration = () => {
+    setIsCalibrating(true);
+    setCalibrationPoints([]);
+    setCalibrationDistance(null);
+  };
+
+  const resetCalibration = () => {
+    setIsCalibrating(false);
+    setCalibrationPoints([]);
+    setCalibrationDistance(null);
+    setOrigin(null);
+  };
+
+  const addCalibrationPoint = (point: [number, number]) => {
+    if (calibrationPoints.length < 2) {
+      setCalibrationPoints([...calibrationPoints, point]);
+    }
+  };
+
+  const calculateAndSaveScale = async () => {
+    if (!currentSiteData || calibrationPoints.length < 2 || !calibrationDistance) {
+      toast.error('Please complete calibration first');
+      return;
+    }
+
+    const validation = validateCalibration(calibrationPoints, calibrationDistance);
+    if (!validation.valid) {
+      toast.error(validation.error || 'Invalid calibration');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const scale = calculateScale(calibrationPoints[0], calibrationPoints[1], calibrationDistance);
       
-      {/* Optional: Add a subtle border */}
-      <lineSegments position={[0, 0.02, 0]}>
-        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
-        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
-      </lineSegments>
-    </group>
+      const updatedSite = await upsertSite({
+        ...currentSiteData,
+        scale_m_per_px: scale,
+        origin: origin ? { x: origin[0], y: origin[1] } : currentSiteData.origin,
+      });
+      
+      setSites(sites.map(site => 
+        site.id === currentSite ? updatedSite : site
+      ));
+      
+      toast.success('Map calibration saved successfully!');
+      resetCalibration();
+    } catch (error) {
+      console.error('Save error:', error);
+      toast.error('Failed to save calibration');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onClose={onClose} className="relative z-50">
+      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+      
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel className="bg-slate-800 rounded-lg border border-slate-700 p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-6">
+            <Dialog.Title className="text-xl font-semibold text-white">
+              Map Settings - {currentSiteData?.name}
+            </Dialog.Title>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-slate-400" />
+            </button>
+          </div>
+          
+          <div className="space-y-6">
+            {/* File Upload Section */}
+            <div>
+              <h3 className="text-lg font-medium text-slate-300 mb-4">Upload Map Image</h3>
+              <div className="space-y-4">
+                <div>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                    onChange={handleFileSelect}
+                    className="block w-full text-sm text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Supported formats: PNG, JPEG, WebP, GIF (max 10MB)
+                  </p>
+                </div>
+                
+                {selectedFile && (
+                  <div className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
+                    <span className="text-sm text-slate-300">{selectedFile.name}</span>
+                    <button
+                      onClick={handleFileUpload}
+                      disabled={uploading}
+                      className="flex items-center space-x-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded text-sm transition-colors"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>{uploading ? 'Uploading...' : 'Upload'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Map Calibration Section */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-slate-300">Map Calibration</h3>
+                <div className="flex items-center space-x-2">
+                  {!isCalibrating ? (
+                    <button
+                      onClick={startCalibration}
+                      className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-sm transition-colors"
+                    >
+                      Start Calibration
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={resetCalibration}
+                        className="flex items-center space-x-1 px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white rounded text-sm transition-colors"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Reset</span>
+                      </button>
+                      <button
+                        onClick={calculateAndSaveScale}
+                        disabled={calibrationPoints.length < 2 || !calibrationDistance || saving}
+                        className="flex items-center space-x-1 px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-green-800 text-white rounded text-sm transition-colors"
+                      >
+                        <Save className="w-3 h-3" />
+                        <span>{saving ? 'Saving...' : 'Save'}</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Calibration Canvas */}
+              <MapCalibrationCanvas
+                imageUrl={previewUrl || currentSiteData?.map_url || undefined}
+                isCalibrating={isCalibrating}
+                calibrationPoints={calibrationPoints}
+                origin={origin}
+              />
+
+              {/* Calibration Controls */}
+              {isCalibrating && (
+                <div className="mt-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Calibration Points
+                      </label>
+                      <div className="text-sm text-slate-400">
+                        {calibrationPoints.length === 0 && "Click first point on the map"}
+                        {calibrationPoints.length === 1 && "Click second point on the map"}
+                        {calibrationPoints.length === 2 && "Both points selected"}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Real Distance (meters)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={calibrationDistance || ''}
+                        onChange={(e) => setCalibrationDistance(parseFloat(e.target.value) || null)}
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white"
+                        placeholder="e.g., 5.0"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Current Settings Display */}
+              {currentSiteData && (
+                <div className="mt-4 p-4 bg-slate-700 rounded-lg">
+                  <h4 className="text-sm font-medium text-slate-300 mb-2">Current Settings</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm text-slate-400">
+                    <div>
+                      <span className="font-medium">Scale:</span> {currentSiteData.scale_m_per_px.toFixed(4)} m/px
+                    </div>
+                    <div>
+                      <span className="font-medium">Origin:</span> ({currentSiteData.origin.x}, {currentSiteData.origin.y})
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </Dialog.Panel>
+      </div>
+    </Dialog>
   );
 };
 
-export default MapLayer;
+export default MapSettingsPanel;
