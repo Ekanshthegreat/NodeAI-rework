@@ -1,207 +1,171 @@
-import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
-import type { User } from '@supabase/supabase-js';
-import type { Robot, Site, Mission, Event, TelemetryMessage, MissionPlan } from '../types';
+import React, { useRef, useMemo, useEffect, useState } from 'react';
+import { useLoader } from '@react-three/fiber';
+import { TextureLoader } from 'three';
+import * as THREE from 'three';
+import type { Site } from '../../types';
+import { getSignedMapUrl } from '../../lib/supabase';
+import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 
-interface KPI {
-  replans_count: number;
-  interventions_avoided: number;
-  mttr_ms_avg: number;
+interface MapLayerProps {
+  site: Site;
+  visible?: boolean;
 }
 
-interface PolicyConfig {
-  selfHealEnabled: boolean;
-  defaultMinBatteryPct: number;
-  defaultBlockedSeconds: number;
-}
+const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
+  const [textureLoaded, setTextureLoaded] = useState(false);
+  const { pushEvent } = useAppStore();
+  
+  // Resolve map URL
+  useEffect(() => {
+    const resolveMapUrl = async () => {
+      try {
+        if (site.map_url) {
+          const resolved = await getSignedMapUrl(site.map_url);
+          setMapUrlResolved(resolved);
+          
+          if (resolved) {
+            pushEvent({
+              ts: Date.now(),
+              level: 'INFO',
+              msg: `[DEMO] Map loaded: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
+            });
+          } else {
+            pushEvent({
+              ts: Date.now(),
+              level: 'WARN',
+              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
+              payload: { site_id: site.id, map_url: site.map_url }
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to resolve map URL:', error);
+        setMapUrlResolved(null);
+        pushEvent({
+          ts: Date.now(),
+          level: 'WARN',
+          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
+          payload: { error, site_id: site.id, map_url: site.map_url }
+        });
+      }
+    };
+    
+    resolveMapUrl();
+  }, [site.map_url, site.id, site.name, pushEvent]);
+  
+  // Create texture
+  const texture = useMemo(() => {
+    if (!mapUrlResolved) {
+      // Create fallback grid texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        // Dark hospital floor
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Grid lines
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1;
+        
+        for (let i = 0; i <= 512; i += 32) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, 512);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(0, i);
+          ctx.lineTo(512, i);
+          ctx.stroke();
+        }
+        
+        // Hospital areas (simplified)
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(100, 100, 80, 60); // Pharmacy
+        ctx.fillRect(300, 300, 100, 80); // Ward A
+        ctx.fillRect(400, 100, 60, 60); // Lab
+        
+        // Labels
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Pharmacy', 140, 135);
+        ctx.fillText('Ward A', 350, 345);
+        ctx.fillText('Lab', 430, 135);
+        ctx.fillText(site.name, 256, 50);
+      }
+      
+      const fallbackTexture = new THREE.CanvasTexture(canvas);
+      fallbackTexture.wrapS = THREE.RepeatWrapping;
+      fallbackTexture.wrapT = THREE.RepeatWrapping;
+      setTextureLoaded(true);
+      return fallbackTexture;
+    }
+    
+    // Try to load actual map image
+    const loader = new TextureLoader();
+    const mapTexture = loader.load(
+      mapUrlResolved,
+      () => setTextureLoaded(true),
+      undefined,
+      (error) => {
+        console.warn('Failed to load map texture:', error);
+        setTextureLoaded(true);
+      }
+    );
+    
+    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
+    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
+    return mapTexture;
+  }, [mapUrlResolved, site.name]);
+  
+  // Calculate plane dimensions based on scale
+  const planeDimensions = useMemo(() => {
+    // Standard map size for consistent scaling
+    const mapWidth = 1024;
+    const mapHeight = 1024;
+    
+    // Convert pixels to meters using the site's scale
+    const worldWidth = mapWidth * site.scale_m_per_px;
+    const worldHeight = mapHeight * site.scale_m_per_px;
+    
+    return [worldWidth, worldHeight];
+  }, [site.scale_m_per_px]);
+  
+  if (!visible || !textureLoaded) return null;
+  
+  return (
+    <group position={[site.origin.x, 0, site.origin.y]}>
+      <mesh
+        ref={meshRef}
+        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
+        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
+        receiveShadow
+      >
+        <planeGeometry args={planeDimensions} />
+        <meshStandardMaterial
+          map={texture}
+          transparent
+          opacity={0.9}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Optional: Add a subtle border */}
+      <lineSegments position={[0, 0.02, 0]}>
+        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
+        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
+      </lineSegments>
+    </group>
+  );
+};
 
-interface FaultInjection {
-  blockedUntil?: number;
-  drained?: boolean;
-}
-
-interface AppStore {
-  // Auth
-  user: User | null;
-  isAuthenticated: boolean;
-  
-  // Current selections
-  currentSite: string | null;
-  selectedRobot: string | null;
-  selectedMission: string | null;
-  
-  // Data
-  sites: Site[];
-  robots: Robot[];
-  missions: Mission[];
-  events: Event[];
-  telemetryBuffer: TelemetryMessage[];
-  
-  // Policy & KPI
-  kpi: KPI;
-  policy: PolicyConfig;
-  faultInjected: Record<string, FaultInjection>;
-  missionPlans: Record<string, MissionPlan>;
-  
-  // UI State
-  isRealtimeConnected: boolean;
-  telemetryEnabled: boolean;
-  sidebarOpen: boolean;
-  
-  // Actions
-  setUser: (user: User | null) => void;
-  setCurrentSite: (siteId: string | null) => void;
-  setSelectedRobot: (robotId: string | null) => void;
-  setSelectedMission: (missionId: string | null) => void;
-  setSites: (sites: Site[]) => void;
-  setRobots: (robots: Robot[]) => void;
-  setMissions: (missions: Mission[]) => void;
-  addEvent: (event: Event) => void;
-  addTelemetry: (telemetry: TelemetryMessage) => void;
-  setRealtimeConnected: (connected: boolean) => void;
-  setTelemetryEnabled: (enabled: boolean) => void;
-  toggleSidebar: () => void;
-  clearTelemetryBuffer: () => void;
-  
-  // Policy & KPI Actions
-  setMissionPlan: (mission_id: string, plan: MissionPlan) => void;
-  setPolicy: (p: Partial<PolicyConfig>) => void;
-  bumpKPI: (delta: Partial<KPI>) => void;
-  setFault: (robotId: string, patch: FaultInjection) => void;
-  pushEvent: (event: { ts: number; level: 'INFO' | 'WARN' | 'ERROR'; msg: string; payload?: Record<string, unknown> }) => void;
-}
-
-export const useAppStore = create<AppStore>()(
-  devtools(
-    (set, get) => ({
-      // Initial state
-      user: null,
-      isAuthenticated: false,
-      currentSite: null,
-      selectedRobot: null,
-      selectedMission: null,
-      sites: [],
-      robots: [],
-      missions: [],
-      events: [],
-      telemetryBuffer: [],
-      isRealtimeConnected: false,
-      telemetryEnabled: true,
-      sidebarOpen: true,
-      
-      // Policy & KPI initial state
-      kpi: {
-        replans_count: 0,
-        interventions_avoided: 0,
-        mttr_ms_avg: 0,
-      },
-      policy: {
-        selfHealEnabled: true,
-        defaultMinBatteryPct: 0.2,
-        defaultBlockedSeconds: 10,
-      },
-      faultInjected: {},
-      missionPlans: {},
-
-      // Actions
-      setUser: (user) =>
-        set({ user, isAuthenticated: !!user }, false, 'setUser'),
-      
-      setCurrentSite: (siteId) =>
-        set({ currentSite: siteId }, false, 'setCurrentSite'),
-      
-      setSelectedRobot: (robotId) =>
-        set({ selectedRobot: robotId }, false, 'setSelectedRobot'),
-      
-      setSelectedMission: (missionId) =>
-        set({ selectedMission: missionId }, false, 'setSelectedMission'),
-      
-      setSites: (sites) =>
-        set({ sites }, false, 'setSites'),
-      
-      setRobots: (robots) =>
-        set({ robots }, false, 'setRobots'),
-      
-      setMissions: (missions) =>
-        set({ missions }, false, 'setMissions'),
-      
-      addEvent: (event) =>
-        set(
-          (state) => ({ events: [...state.events.slice(-99), event] }),
-          false,
-          'addEvent'
-        ),
-      
-      addTelemetry: (telemetry) =>
-        set(
-          (state) => ({
-            telemetryBuffer: [...state.telemetryBuffer.slice(-999), telemetry],
-          }),
-          false,
-          'addTelemetry'
-        ),
-      
-      setRealtimeConnected: (connected) =>
-        set({ isRealtimeConnected: connected }, false, 'setRealtimeConnected'),
-      
-      setTelemetryEnabled: (enabled) =>
-        set({ telemetryEnabled: enabled }, false, 'setTelemetryEnabled'),
-      
-      toggleSidebar: () =>
-        set((state) => ({ sidebarOpen: !state.sidebarOpen }), false, 'toggleSidebar'),
-      
-      clearTelemetryBuffer: () =>
-        set({ telemetryBuffer: [] }, false, 'clearTelemetryBuffer'),
-      
-      // Policy & KPI Actions
-      setMissionPlan: (mission_id, plan) =>
-        set(
-          (state) => ({
-            missionPlans: { ...state.missionPlans, [mission_id]: plan }
-          }),
-          false,
-          'setMissionPlan'
-        ),
-      
-      setPolicy: (p) =>
-        set(
-          (state) => ({ policy: { ...state.policy, ...p } }),
-          false,
-          'setPolicy'
-        ),
-      
-      bumpKPI: (delta) =>
-        set(
-          (state) => ({ kpi: { ...state.kpi, ...delta } }),
-          false,
-          'bumpKPI'
-        ),
-      
-      setFault: (robotId, patch) =>
-        set(
-          (state) => ({
-            faultInjected: { ...state.faultInjected, [robotId]: patch }
-          }),
-          false,
-          'setFault'
-        ),
-      
-      pushEvent: (event) =>
-        set(
-          (state) => ({
-            events: [...state.events.slice(-99), {
-              id: `event-${Date.now()}`,
-              mission_id: null,
-              robot_id: null,
-              type: 'system',
-              payload: event.payload || {},
-              ts: new Date(event.ts).toISOString(),
-            }]
-          }),
-          false,
-          'pushEvent'
-        ),
-    }),
-    { name: 'nodeai-store' }
-  )
-);
+export default MapLayer;
