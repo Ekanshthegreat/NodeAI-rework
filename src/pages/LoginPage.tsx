@@ -5,7 +5,6 @@ import * as THREE from 'three';
 import type { Site } from '../../types';
 import { getSignedMapUrl } from '../../lib/supabase';
 import { useAppStore } from '../../store/useAppStore';
-import { useAppStore } from '../../store/useAppStore';
 
 interface MapLayerProps {
   site: Site;
