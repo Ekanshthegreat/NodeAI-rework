@@ -1,11 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { useSceneStore } from '../../store/useSceneStore';
 
 interface MapCalibrationCanvasProps {
   imageUrl?: string;
   isCalibrating: boolean;
   calibrationPoints: Array<[number, number]>;
   origin: [number, number] | null;
+  onAddCalibrationPoint: (point: [number, number]) => void;
+  onSetOrigin: (point: [number, number]) => void;
 }
 
 const MapCalibrationCanvas: React.FC<MapCalibrationCanvasProps> = ({
@@ -13,12 +14,12 @@ const MapCalibrationCanvas: React.FC<MapCalibrationCanvasProps> = ({
   isCalibrating,
   calibrationPoints,
   origin,
+  onAddCalibrationPoint,
+  onSetOrigin,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
-  
-  const { addCalibrationPoint, setOrigin } = useSceneStore();
 
   // Load image
   useEffect(() => {
@@ -173,10 +174,10 @@ const MapCalibrationCanvas: React.FC<MapCalibrationCanvasProps> = ({
 
     if (isCalibrating && calibrationPoints.length < 2) {
       // Add calibration point
-      addCalibrationPoint([imageX, imageY]);
+      onAddCalibrationPoint([imageX, imageY]);
     } else if (!isCalibrating) {
       // Set origin
-      setOrigin([imageX, imageY]);
+      onSetOrigin([imageX, imageY]);
     }
   };
 
