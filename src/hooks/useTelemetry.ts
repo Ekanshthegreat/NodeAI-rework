@@ -1,171 +1,231 @@
-import React, { useRef, useMemo, useEffect, useState } from 'react';
-import { useLoader } from '@react-three/fiber';
-import { TextureLoader } from 'three';
-import * as THREE from 'three';
-import type { Site } from '../../types';
-import { getSignedMapUrl } from '../../lib/supabase';
-import { useAppStore } from '../../store/useAppStore';
-import { useAppStore } from '../../store/useAppStore';
+import { useEffect, useRef } from 'react';
+import { useAppStore } from '../store/useAppStore';
+import { usePolicyStore } from '../store/usePolicyStore';
+import { useSceneStore } from '../store/useSceneStore';
+import type { Robot, TelemetryPoint } from '../types';
 
-interface MapLayerProps {
-  site: Site;
-  visible?: boolean;
+interface TelemetryConfig {
+  updateInterval: number;
+  movementSpeed: number;
+  batteryDrainRate: number;
+  enableFaultInjection: boolean;
 }
 
-const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
-  const [textureLoaded, setTextureLoaded] = useState(false);
-  const { pushEvent } = useAppStore();
-  
-  // Resolve map URL
-  useEffect(() => {
-    const resolveMapUrl = async () => {
-      try {
-        if (site.map_url) {
-          const resolved = await getSignedMapUrl(site.map_url);
-          setMapUrlResolved(resolved);
-          
-          if (resolved) {
-            pushEvent({
-              ts: Date.now(),
-              level: 'INFO',
-              msg: `[DEMO] Map loaded: ${site.name}`,
-              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
-            });
-          } else {
-            pushEvent({
-              ts: Date.now(),
-              level: 'WARN',
-              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
-              payload: { site_id: site.id, map_url: site.map_url }
-            });
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to resolve map URL:', error);
-        setMapUrlResolved(null);
-        pushEvent({
-          ts: Date.now(),
-          level: 'WARN',
-          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
-          payload: { error, site_id: site.id, map_url: site.map_url }
-        });
-      }
-    };
-    
-    resolveMapUrl();
-  }, [site.map_url, site.id, site.name, pushEvent]);
-  
-  // Create texture
-  const texture = useMemo(() => {
-    if (!mapUrlResolved) {
-      // Create fallback grid texture
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-      
-      if (ctx) {
-        // Dark hospital floor
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(0, 0, 512, 512);
-        
-        // Grid lines
-        ctx.strokeStyle = '#475569';
-        ctx.lineWidth = 1;
-        
-        for (let i = 0; i <= 512; i += 32) {
-          ctx.beginPath();
-          ctx.moveTo(i, 0);
-          ctx.lineTo(i, 512);
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.moveTo(0, i);
-          ctx.lineTo(512, i);
-          ctx.stroke();
-        }
-        
-        // Hospital areas (simplified)
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(100, 100, 80, 60); // Pharmacy
-        ctx.fillRect(300, 300, 100, 80); // Ward A
-        ctx.fillRect(400, 100, 60, 60); // Lab
-        
-        // Labels
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Pharmacy', 140, 135);
-        ctx.fillText('Ward A', 350, 345);
-        ctx.fillText('Lab', 430, 135);
-        ctx.fillText(site.name, 256, 50);
-      }
-      
-      const fallbackTexture = new THREE.CanvasTexture(canvas);
-      fallbackTexture.wrapS = THREE.RepeatWrapping;
-      fallbackTexture.wrapT = THREE.RepeatWrapping;
-      setTextureLoaded(true);
-      return fallbackTexture;
-    }
-    
-    // Try to load actual map image
-    const loader = new TextureLoader();
-    const mapTexture = loader.load(
-      mapUrlResolved,
-      () => setTextureLoaded(true),
-      undefined,
-      (error) => {
-        console.warn('Failed to load map texture:', error);
-        setTextureLoaded(true);
-      }
-    );
-    
-    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
-    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
-    return mapTexture;
-  }, [mapUrlResolved, site.name]);
-  
-  // Calculate plane dimensions based on scale
-  const planeDimensions = useMemo(() => {
-    // Standard map size for consistent scaling
-    const mapWidth = 1024;
-    const mapHeight = 1024;
-    
-    // Convert pixels to meters using the site's scale
-    const worldWidth = mapWidth * site.scale_m_per_px;
-    const worldHeight = mapHeight * site.scale_m_per_px;
-    
-    return [worldWidth, worldHeight];
-  }, [site.scale_m_per_px]);
-  
-  if (!visible || !textureLoaded) return null;
-  
-  return (
-    <group position={[site.origin.x, 0, site.origin.y]}>
-      <mesh
-        ref={meshRef}
-        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
-        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
-        receiveShadow
-      >
-        <planeGeometry args={planeDimensions} />
-        <meshStandardMaterial
-          map={texture}
-          transparent
-          opacity={0.9}
-          depthWrite={false}
-        />
-      </mesh>
-      
-      {/* Optional: Add a subtle border */}
-      <lineSegments position={[0, 0.02, 0]}>
-        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
-        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
-      </lineSegments>
-    </group>
-  );
+const DEFAULT_CONFIG: TelemetryConfig = {
+  updateInterval: 100, // ms
+  movementSpeed: 0.5, // m/s
+  batteryDrainRate: 0.001, // per update
+  enableFaultInjection: true,
 };
 
-export default MapLayer;
+export const useTelemetry = (config: Partial<TelemetryConfig> = {}) => {
+  const finalConfig = { ...DEFAULT_CONFIG, ...config };
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastUpdateRef = useRef<number>(Date.now());
+  
+  const {
+    robots,
+    setRobots,
+    addTelemetry,
+    addEvent,
+    telemetryEnabled,
+    faultInjected,
+    selectedMission,
+  } = useAppStore();
+  
+  const { evaluatePolicy } = usePolicyStore();
+  const { missionPaths } = useSceneStore();
+
+  // Simulate robot movement along mission path
+  const simulateMovement = (robot: Robot, deltaTime: number): Robot => {
+    if (!selectedMission || robot.status !== 'ACTIVE') {
+      return robot;
+    }
+
+    const missionPath = missionPaths[selectedMission.id];
+    if (!missionPath || missionPath.length === 0) {
+      return robot;
+    }
+
+    // Simple path following simulation
+    const currentPos = robot.pose;
+    const targetIndex = Math.min(
+      Math.floor((Date.now() - (selectedMission.created_at?.getTime() || 0)) / 5000),
+      missionPath.length - 1
+    );
+    
+    if (targetIndex < missionPath.length) {
+      const target = missionPath[targetIndex];
+      const dx = target.x - currentPos.x;
+      const dy = target.y - currentPos.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (distance > 0.1) {
+        const moveDistance = finalConfig.movementSpeed * (deltaTime / 1000);
+        const ratio = Math.min(moveDistance / distance, 1);
+        
+        return {
+          ...robot,
+          pose: {
+            x: currentPos.x + dx * ratio,
+            y: currentPos.y + dy * ratio,
+            theta: Math.atan2(dy, dx),
+          },
+        };
+      }
+    }
+
+    return robot;
+  };
+
+  // Simulate battery drain
+  const simulateBattery = (robot: Robot): Robot => {
+    if (robot.status === 'ACTIVE') {
+      const newBattery = Math.max(0, robot.battery - finalConfig.batteryDrainRate);
+      
+      // Battery critical event
+      if (newBattery < 0.2 && robot.battery >= 0.2) {
+        addEvent({
+          ts: Date.now(),
+          level: 'WARN',
+          msg: `Battery critical for robot ${robot.id}`,
+          payload: { robot_id: robot.id, battery: newBattery },
+        });
+      }
+      
+      return { ...robot, battery: newBattery };
+    }
+    
+    return robot;
+  };
+
+  // Apply fault injection
+  const applyFaultInjection = (robot: Robot): Robot => {
+    if (!finalConfig.enableFaultInjection || !faultInjected) {
+      return robot;
+    }
+
+    // Random fault scenarios
+    const faultChance = Math.random();
+    
+    if (faultChance < 0.001) { // 0.1% chance per update
+      const faults = ['FAULT', 'ERROR', 'MAINTENANCE'];
+      const randomFault = faults[Math.floor(Math.random() * faults.length)];
+      
+      addEvent({
+        ts: Date.now(),
+        level: 'ERROR',
+        msg: `Fault injected: ${randomFault} for robot ${robot.id}`,
+        payload: { robot_id: robot.id, fault_type: randomFault },
+      });
+      
+      return { ...robot, status: randomFault };
+    }
+    
+    return robot;
+  };
+
+  // Main telemetry update loop
+  const updateTelemetry = () => {
+    const now = Date.now();
+    const deltaTime = now - lastUpdateRef.current;
+    lastUpdateRef.current = now;
+
+    if (!telemetryEnabled || robots.length === 0) {
+      return;
+    }
+
+    const updatedRobots = robots.map(robot => {
+      let updatedRobot = robot;
+      
+      // Apply simulations
+      updatedRobot = simulateMovement(updatedRobot, deltaTime);
+      updatedRobot = simulateBattery(updatedRobot);
+      updatedRobot = applyFaultInjection(updatedRobot);
+      
+      // Update timestamp
+      updatedRobot = {
+        ...updatedRobot,
+        updated_at: new Date(),
+      };
+
+      // Add telemetry point
+      const telemetryPoint: TelemetryPoint = {
+        timestamp: now,
+        robot_id: robot.id,
+        position: updatedRobot.pose,
+        battery: updatedRobot.battery,
+        status: updatedRobot.status,
+        velocity: {
+          x: (updatedRobot.pose.x - robot.pose.x) / (deltaTime / 1000),
+          y: (updatedRobot.pose.y - robot.pose.y) / (deltaTime / 1000),
+        },
+      };
+      
+      addTelemetry(telemetryPoint);
+
+      // Evaluate policies
+      try {
+        evaluatePolicy(updatedRobot, telemetryPoint);
+      } catch (error) {
+        addEvent({
+          ts: now,
+          level: 'ERROR',
+          msg: `Policy evaluation error for robot ${robot.id}`,
+          payload: { error: (error as Error).message, robot_id: robot.id },
+        });
+      }
+
+      return updatedRobot;
+    });
+
+    setRobots(updatedRobots);
+  };
+
+  // Start/stop telemetry
+  useEffect(() => {
+    if (telemetryEnabled) {
+      addEvent({
+        ts: Date.now(),
+        level: 'INFO',
+        msg: 'Telemetry system started',
+        payload: { config: finalConfig },
+      });
+
+      intervalRef.current = setInterval(updateTelemetry, finalConfig.updateInterval);
+      
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        
+        addEvent({
+          ts: Date.now(),
+          level: 'INFO',
+          msg: 'Telemetry system stopped',
+          payload: {},
+        });
+      };
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+  }, [telemetryEnabled, finalConfig.updateInterval]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
+
+  return {
+    isRunning: telemetryEnabled && intervalRef.current !== null,
+    config: finalConfig,
+  };
+};
