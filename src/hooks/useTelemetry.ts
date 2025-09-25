@@ -1,170 +1,104 @@
-import React, { useRef, useMemo, useEffect, useState } from 'react';
-import { useLoader } from '@react-three/fiber';
-import { TextureLoader } from 'three';
-import * as THREE from 'three';
-import type { Site } from '../../types';
-import { getSignedMapUrl } from '../../lib/supabase';
-import { useAppStore } from '../../store/useAppStore';
+import { useEffect, useRef } from 'react';
+import { useAppStore } from '../store/useAppStore';
 
-interface MapLayerProps {
-  site: Site;
-  visible?: boolean;
+interface UseTelemetryOptions {
+  enabled?: boolean;
+  interval?: number;
 }
 
-const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
-  const [textureLoaded, setTextureLoaded] = useState(false);
-  const { addEvent } = useAppStore();
-  
-  // Resolve map URL
+export const useTelemetry = (options: UseTelemetryOptions = {}) => {
+  const { enabled = true, interval = 1000 } = options;
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const { 
+    robots, 
+    setRobots, 
+    addEvent, 
+    addTelemetry, 
+    updateKpi,
+    telemetryEnabled 
+  } = useAppStore();
+
   useEffect(() => {
-    const resolveMapUrl = async () => {
-      try {
-        if (site.map_url) {
-          const resolved = await getSignedMapUrl(site.map_url);
-          setMapUrlResolved(resolved);
-          
-          if (resolved) {
-            addEvent({
-              ts: Date.now(),
-              level: 'INFO',
-              msg: `[DEMO] Map loaded: ${site.name}`,
-              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
-            });
-          } else {
-            addEvent({
-              ts: Date.now(),
-              level: 'WARN',
-              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
-              payload: { site_id: site.id, map_url: site.map_url }
-            });
-          }
+    if (!enabled || !telemetryEnabled || robots.length === 0) {
+      return;
+    }
+
+    addEvent({
+      ts: Date.now(),
+      level: 'INFO',
+      msg: '[TELEMETRY] Starting telemetry simulation',
+      payload: { robot_count: robots.length }
+    });
+
+    intervalRef.current = setInterval(() => {
+      const updatedRobots = robots.map(robot => {
+        // Simple random walk movement
+        const deltaX = (Math.random() - 0.5) * 0.5;
+        const deltaY = (Math.random() - 0.5) * 0.5;
+        const deltaTheta = (Math.random() - 0.5) * 0.2;
+
+        const newPose = {
+          x: robot.pose.x + deltaX,
+          y: robot.pose.y + deltaY,
+          theta: robot.pose.theta + deltaTheta
+        };
+
+        // Slowly drain battery
+        const newBattery = Math.max(0, robot.battery - 0.001);
+        
+        // Change status based on battery
+        let newStatus = robot.status;
+        if (newBattery < 0.2 && robot.status !== 'CHARGING') {
+          newStatus = 'CHARGING';
+        } else if (newBattery > 0.8 && robot.status === 'CHARGING') {
+          newStatus = 'IDLE';
         }
-      } catch (error) {
-        console.warn('Failed to resolve map URL:', error);
-        setMapUrlResolved(null);
-        addEvent({
-          ts: Date.now(),
-          level: 'WARN',
-          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
-          payload: { error, site_id: site.id, map_url: site.map_url }
+
+        const updatedRobot = {
+          ...robot,
+          pose: newPose,
+          battery: newBattery,
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        };
+
+        // Add telemetry data
+        addTelemetry({
+          robot_id: robot.id,
+          pose: newPose,
+          battery: newBattery,
+          status: newStatus,
+          velocity: Math.sqrt(deltaX * deltaX + deltaY * deltaY),
+          timestamp: Date.now()
         });
+
+        return updatedRobot;
+      });
+
+      setRobots(updatedRobots);
+
+      // Update KPIs
+      const activeRobots = updatedRobots.filter(r => r.status === 'ACTIVE').length;
+      const batteryAverage = updatedRobots.reduce((sum, r) => sum + r.battery, 0) / updatedRobots.length;
+
+      updateKpi({
+        totalRobots: updatedRobots.length,
+        activeRobots,
+        batteryAverage
+      });
+
+    }, interval);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
-    
-    resolveMapUrl();
-  }, [site.map_url, site.id, site.name, addEvent]);
-  
-  // Create texture
-  const texture = useMemo(() => {
-    if (!mapUrlResolved) {
-      // Create fallback grid texture
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-      
-      if (ctx) {
-        // Dark hospital floor
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(0, 0, 512, 512);
-        
-        // Grid lines
-        ctx.strokeStyle = '#475569';
-        ctx.lineWidth = 1;
-        
-        for (let i = 0; i <= 512; i += 32) {
-          ctx.beginPath();
-          ctx.moveTo(i, 0);
-          ctx.lineTo(i, 512);
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.moveTo(0, i);
-          ctx.lineTo(512, i);
-          ctx.stroke();
-        }
-        
-        // Hospital areas (simplified)
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(100, 100, 80, 60); // Pharmacy
-        ctx.fillRect(300, 300, 100, 80); // Ward A
-        ctx.fillRect(400, 100, 60, 60); // Lab
-        
-        // Labels
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Pharmacy', 140, 135);
-        ctx.fillText('Ward A', 350, 345);
-        ctx.fillText('Lab', 430, 135);
-        ctx.fillText(site.name, 256, 50);
-      }
-      
-      const fallbackTexture = new THREE.CanvasTexture(canvas);
-      fallbackTexture.wrapS = THREE.RepeatWrapping;
-      fallbackTexture.wrapT = THREE.RepeatWrapping;
-      setTextureLoaded(true);
-      return fallbackTexture;
-    }
-    
-    // Try to load actual map image
-    const loader = new TextureLoader();
-    const mapTexture = loader.load(
-      mapUrlResolved,
-      () => setTextureLoaded(true),
-      undefined,
-      (error) => {
-        console.warn('Failed to load map texture:', error);
-        setTextureLoaded(true);
-      }
-    );
-    
-    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
-    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
-    return mapTexture;
-  }, [mapUrlResolved, site.name]);
-  
-  // Calculate plane dimensions based on scale
-  const planeDimensions = useMemo(() => {
-    // Standard map size for consistent scaling
-    const mapWidth = 1024;
-    const mapHeight = 1024;
-    
-    // Convert pixels to meters using the site's scale
-    const worldWidth = mapWidth * site.scale_m_per_px;
-    const worldHeight = mapHeight * site.scale_m_per_px;
-    
-    return [worldWidth, worldHeight];
-  }, [site.scale_m_per_px]);
-  
-  if (!visible || !textureLoaded) return null;
-  
-  return (
-    <group position={[site.origin.x, 0, site.origin.y]}>
-      <mesh
-        ref={meshRef}
-        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
-        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
-        receiveShadow
-      >
-        <planeGeometry args={planeDimensions} />
-        <meshStandardMaterial
-          map={texture}
-          transparent
-          opacity={0.9}
-          depthWrite={false}
-        />
-      </mesh>
-      
-      {/* Optional: Add a subtle border */}
-      <lineSegments position={[0, 0.02, 0]}>
-        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
-        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
-      </lineSegments>
-    </group>
-  );
-};
+  }, [enabled, telemetryEnabled, robots, interval, setRobots, addEvent, addTelemetry, updateKpi]);
 
-export default MapLayer;
+  return {
+    isRunning: !!intervalRef.current,
+    robotCount: robots.length
+  };
+};
