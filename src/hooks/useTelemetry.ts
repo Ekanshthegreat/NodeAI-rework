@@ -1,198 +1,161 @@
-import React, { useRef, useMemo, useEffect, useState } from 'react';
-import { useLoader } from '@react-three/fiber';
-import { TextureLoader } from 'three';
-import * as THREE from 'three';
-import type { Site } from '../../types';
-import { getSignedMapUrl } from '../../lib/supabase';
-import { useAppStore } from '../../store/useAppStore';
-import { useAppStore } from '../../store/useAppStore';
+import { useEffect, useRef } from 'react';
+import { useAppStore } from '../store/useAppStore';
+import { markRobotProgress, evaluatePoliciesOnTick } from '../lib/policy';
+import type { TelemetryMessage } from '../types';
 
-interface MapLayerProps {
-  site: Site;
-  visible?: boolean;
-}
+const TELEM_PERIOD_MS = 2000; // 2 seconds
 
-const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
-  const [textureLoaded, setTextureLoaded] = useState(false);
-  const { pushEvent } = useAppStore();
-  
-  // Resolve map URL
+export const useTelemetry = () => {
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const { 
+    robots, 
+    setRobots, 
+    addTelemetry, 
+    setRealtimeConnected, 
+    telemetryEnabled,
+    faultInjected,
+    pushEvent 
+  } = useAppStore();
+
   useEffect(() => {
-    const resolveMapUrl = async () => {
-      try {
-        // Start telemetry (mock for now, RMF later)
-        cleanupRef.current = startTelemetry('mock');
-        setRealtimeConnected(true);
-        
-        // Log successful telemetry start
-        const { pushEvent } = useAppStore.getState();
-        pushEvent({
-          ts: Date.now(),
-          level: 'INFO',
-          msg: '[DEMO] Telemetry system started',
-          payload: { source: 'mock', enabled: true }
-        });
-      } catch (error) {
-        console.error('Failed to start telemetry:', error);
-        setRealtimeConnected(false);
-        
-        // Log telemetry error
-        const { pushEvent } = useAppStore.getState();
-        pushEvent({
-          ts: Date.now(),
-          level: 'ERROR',
-          msg: `[DEMO] Telemetry startup failed: ${(error as Error).message}`,
-          payload: { error, source: 'mock' }
-        });
+    if (!telemetryEnabled) {
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
       }
+      setRealtimeConnected(false);
+      return;
+    }
+
+    try {
+      // Start telemetry (mock for now, RMF later)
+      cleanupRef.current = startTelemetry('mock');
+      setRealtimeConnected(true);
       
-      try {
-        if (site.map_url) {
-          const resolved = await getSignedMapUrl(site.map_url);
-          setMapUrlResolved(resolved);
+      // Log successful telemetry start
+      pushEvent({
+        ts: Date.now(),
+        level: 'INFO',
+        msg: '[DEMO] Telemetry system started',
+        payload: { source: 'mock', enabled: true }
+      });
+    } catch (error) {
+      console.error('Failed to start telemetry:', error);
+      setRealtimeConnected(false);
+      
+      // Log telemetry error
+      pushEvent({
+        ts: Date.now(),
+        level: 'ERROR',
+        msg: `[DEMO] Telemetry startup failed: ${(error as Error).message}`,
+        payload: { error, source: 'mock' }
+      });
+    }
+
+    return () => {
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
+      setRealtimeConnected(false);
+    };
+  }, [telemetryEnabled, setRealtimeConnected, pushEvent]);
+
+  const startTelemetry = (source: 'mock' | 'rmf' | 'vda5050'): (() => void) => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      
+      // Update robot states and generate telemetry
+      const updatedRobots = robots.map(robot => {
+        const fault = faultInjected[robot.id];
+        let { pose, battery, status } = robot;
+        
+        // Apply fault injection
+        if (fault?.drained) {
+          battery = Math.max(0, battery - 0.05); // Rapid drain
+        }
+        
+        if (fault?.blockedUntil && now < fault.blockedUntil) {
+          status = 'BLOCKED';
+        }
+        
+        // Simulate robot movement and battery changes
+        if (status === 'ACTIVE' && !fault?.blockedUntil) {
+          // Simple movement simulation
+          pose = {
+            ...pose,
+            x: pose.x + (Math.random() - 0.5) * 0.2,
+            y: pose.y + (Math.random() - 0.5) * 0.2,
+            theta: pose.theta + (Math.random() - 0.5) * 0.1,
+          };
           
-          if (resolved) {
-            pushEvent({
-              ts: Date.now(),
-              level: 'INFO',
-              msg: `[DEMO] Map loaded: ${site.name}`,
-              payload: { site_id: site.id, map_url: site.map_url, resolved_url: resolved }
-            });
-          } else {
-            pushEvent({
-              ts: Date.now(),
-              level: 'WARN',
-              msg: `[DEMO] Map load failed, using fallback grid: ${site.name}`,
-              payload: { site_id: site.id, map_url: site.map_url }
-            });
+          // Active battery drain: 0.2% per second
+          battery = Math.max(0, battery - (0.002 * TELEM_PERIOD_MS / 1000));
+        } else if (status === 'CHARGING') {
+          // Charging: 1% per second
+          battery = Math.min(1, battery + (0.01 * TELEM_PERIOD_MS / 1000));
+          
+          // Stop charging when full
+          if (battery >= 0.95) {
+            status = 'IDLE';
           }
         }
-      } catch (error) {
-        console.warn('Failed to resolve map URL:', error);
-        setMapUrlResolved(null);
-        pushEvent({
-          ts: Date.now(),
-          level: 'WARN',
-          msg: `[DEMO] Map resolution error: ${(error as Error).message}`,
-          payload: { error, site_id: site.id, map_url: site.map_url }
-        });
-      }
-    };
-    
-    resolveMapUrl();
-  }, [site.map_url, site.id, site.name, pushEvent]);
-  
-  // Create texture
-  const texture = useMemo(() => {
-    if (!mapUrlResolved) {
-      // Create fallback grid texture
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-      
-      if (ctx) {
-        // Dark hospital floor
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(0, 0, 512, 512);
         
-        // Grid lines
-        ctx.strokeStyle = '#475569';
-        ctx.lineWidth = 1;
-        
-        for (let i = 0; i <= 512; i += 32) {
-          ctx.beginPath();
-          ctx.moveTo(i, 0);
-          ctx.lineTo(i, 512);
-          ctx.stroke();
-          
-          ctx.beginPath();
-          ctx.moveTo(0, i);
-          ctx.lineTo(512, i);
-          ctx.stroke();
+        // Auto-charge when battery is very low
+        if (battery <= 0.15 && status !== 'CHARGING') {
+          status = 'CHARGING';
         }
         
-        // Hospital areas (simplified)
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(100, 100, 80, 60); // Pharmacy
-        ctx.fillRect(300, 300, 100, 80); // Ward A
-        ctx.fillRect(400, 100, 60, 60); // Lab
+        // Track robot progress for policy engine
+        const progressing = status === 'ACTIVE' && !fault?.blockedUntil;
+        markRobotProgress(robot.id, progressing, now);
         
-        // Labels
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Pharmacy', 140, 135);
-        ctx.fillText('Ward A', 350, 345);
-        ctx.fillText('Lab', 430, 135);
-        ctx.fillText(site.name, 256, 50);
-      }
+        // Generate telemetry message
+        const telemetry: TelemetryMessage = {
+          type: 'telemetry',
+          ts: now,
+          robot_id: robot.id,
+          vendor: robot.vendor as 'rmf' | 'vda5050' | 'mock',
+          pose,
+          vel: status === 'ACTIVE' ? 0.5 : 0,
+          battery,
+          status: status as 'IDLE' | 'ACTIVE' | 'ERROR' | 'CHARGING' | 'BLOCKED',
+          task_id: status === 'ACTIVE' ? `task-${robot.id}` : null,
+        };
+        
+        addTelemetry(telemetry);
+        
+        return {
+          ...robot,
+          pose,
+          battery,
+          status,
+          updated_at: new Date().toISOString(),
+        };
+      });
       
-      const fallbackTexture = new THREE.CanvasTexture(canvas);
-      fallbackTexture.wrapS = THREE.RepeatWrapping;
-      fallbackTexture.wrapT = THREE.RepeatWrapping;
-      setTextureLoaded(true);
-      return fallbackTexture;
-    }
-    
-    // Try to load actual map image
-    const loader = new TextureLoader();
-    const mapTexture = loader.load(
-      mapUrlResolved,
-      () => setTextureLoaded(true),
-      undefined,
-      (error) => {
-        console.warn('Failed to load map texture:', error);
-        setTextureLoaded(true);
-      }
-    );
-    
-    mapTexture.wrapS = THREE.ClampToEdgeWrapping;
-    mapTexture.wrapT = THREE.ClampToEdgeWrapping;
-    return mapTexture;
-  }, [mapUrlResolved, site.name]);
-  
-  // Calculate plane dimensions based on scale
-  const planeDimensions = useMemo(() => {
-    // Standard map size for consistent scaling
-    const mapWidth = 1024;
-    const mapHeight = 1024;
-    
-    // Convert pixels to meters using the site's scale
-    const worldWidth = mapWidth * site.scale_m_per_px;
-    const worldHeight = mapHeight * site.scale_m_per_px;
-    
-    return [worldWidth, worldHeight];
-  }, [site.scale_m_per_px]);
-  
-  if (!visible || !textureLoaded) return null;
-  
-  return (
-    <group position={[site.origin.x, 0, site.origin.y]}>
-      <mesh
-        ref={meshRef}
-        rotation={[-Math.PI / 2, 0, 0]} // Rotate to lie flat on XZ plane
-        position={[0, 0.01, 0]} // Slightly above ground to prevent z-fighting
-        receiveShadow
-      >
-        <planeGeometry args={planeDimensions} />
-        <meshStandardMaterial
-          map={texture}
-          transparent
-          opacity={0.9}
-          depthWrite={false}
-        />
-      </mesh>
+      setRobots(updatedRobots);
       
-      {/* Optional: Add a subtle border */}
-      <lineSegments position={[0, 0.02, 0]}>
-        <edgesGeometry args={[new THREE.PlaneGeometry(...planeDimensions)]} />
-        <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
-      </lineSegments>
-    </group>
-  );
-};
+      // Run policy evaluation
+      evaluatePoliciesOnTick(now);
+      
+    }, TELEM_PERIOD_MS);
 
-export default MapLayer;
+    return () => {
+      clearInterval(interval);
+      
+      // Log telemetry stop
+      const { pushEvent } = useAppStore.getState();
+      pushEvent({
+        ts: Date.now(),
+        level: 'INFO',
+        msg: '[DEMO] Telemetry system stopped',
+        payload: { source }
+      });
+    };
+  };
+
+  return {
+    telemetryEnabled,
+  };
+};
