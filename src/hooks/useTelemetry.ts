@@ -20,32 +20,36 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   
   // Resolve map URL
   useEffect(() => {
-    try {
-      // Start telemetry (mock for now, RMF later)
-      cleanupRef.current = startTelemetry('mock');
-      setRealtimeConnected(true);
+    const resolveMapUrl = async () => {
+      try {
+        // Start telemetry (mock for now, RMF later)
+        cleanupRef.current = startTelemetry('mock');
+        setRealtimeConnected(true);
+        
+        // Log successful telemetry start
+        const { pushEvent } = useAppStore.getState();
+        pushEvent({
+          ts: Date.now(),
+          level: 'INFO',
+          msg: '[DEMO] Telemetry system started',
+          payload: { source: 'mock', enabled: true }
+        });
+      } catch (error) {
+        console.error('Failed to start telemetry:', error);
+        setRealtimeConnected(false);
+        
+        // Log telemetry error
+        const { pushEvent } = useAppStore.getState();
+        pushEvent({
+          ts: Date.now(),
+          level: 'ERROR',
+          msg: `[DEMO] Telemetry startup failed: ${(error as Error).message}`,
+          payload: { error, source: 'mock' }
+        });
+      }
       
-      // Log successful telemetry start
-      const { pushEvent } = useAppStore.getState();
-      pushEvent({
-        ts: Date.now(),
-        level: 'INFO',
-        msg: '[DEMO] Telemetry system started',
-        payload: { source: 'mock', enabled: true }
-      });
-    } catch (error) {
-      console.error('Failed to start telemetry:', error);
-      setRealtimeConnected(false);
-      
-      // Log telemetry error
-      const { pushEvent } = useAppStore.getState();
-      pushEvent({
-        ts: Date.now(),
-        level: 'ERROR',
-        msg: `[DEMO] Telemetry startup failed: ${(error as Error).message}`,
-        payload: { error, source: 'mock' }
-      });
-    }
+      try {
+        if (site.map_url) {
           const resolved = await getSignedMapUrl(site.map_url);
           setMapUrlResolved(resolved);
           
@@ -192,12 +196,3 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
 };
 
 export default MapLayer;
-      
-      // Log telemetry stop
-      const { pushEvent } = useAppStore.getState();
-      pushEvent({
-        ts: Date.now(),
-        level: 'INFO',
-        msg: '[DEMO] Telemetry system stopped',
-        payload: { source: 'mock', enabled: false }
-      });
