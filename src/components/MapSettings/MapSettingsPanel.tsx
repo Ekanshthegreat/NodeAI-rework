@@ -3,8 +3,9 @@ import { useLoader } from '@react-three/fiber';
 import { TextureLoader } from 'three';
 import * as THREE from 'three';
 import type { Site } from '../../types';
-import { getSignedMapUrl } from '../lib/supabase';
-import { useAppStore } from '../store/useAppStore';
+import { getSignedMapUrl } from '../../lib/supabase';
+import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '../../store/useAppStore';
 
 interface MapLayerProps {
   site: Site;
@@ -13,13 +14,6 @@ interface MapLayerProps {
 
 const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   const meshRef = useRef<THREE.Mesh>(null);
-    // Check for supported image formats
-    const supportedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
-    if (!supportedTypes.includes(file.type.toLowerCase())) {
-      toast.error('Please select a supported image format (PNG, JPEG, WebP, or GIF)');
-import { getSignedMapUrl } from '../../lib/supabase';
-import { useAppStore } from '../../store/useAppStore';
-import { useAppStore } from '../../store/useAppStore';
   const [mapUrlResolved, setMapUrlResolved] = useState<string | null>(null);
   const [textureLoaded, setTextureLoaded] = useState(false);
   const { addEvent } = useAppStore();
@@ -111,19 +105,7 @@ import { useAppStore } from '../../store/useAppStore';
       
       const fallbackTexture = new THREE.CanvasTexture(canvas);
       fallbackTexture.wrapS = THREE.RepeatWrapping;
-      
-      // Handle specific error types
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      if (errorMessage.includes('mime type') && errorMessage.includes('not supported')) {
-        toast.error('File format not supported. Please use PNG, JPEG, WebP, or GIF.');
-      } else if (errorMessage.includes('row-level security policy')) {
-        toast.error('Permission denied. Please ensure you are logged in and have proper access.');
-      } else if (errorMessage.includes('Unauthorized')) {
-        toast.error('Access denied. Please check your authentication status.');
-      } else {
-        toast.error('Failed to upload map. Please try again.');
-      }
+      fallbackTexture.wrapT = THREE.RepeatWrapping;
       setTextureLoaded(true);
       return fallbackTexture;
     }
