@@ -22,8 +22,11 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
   useEffect(() => {
     const resolveMapUrl = async () => {
       try {
+      }
       // Try to sign in first
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      }
+      )
       canvas.width = 512;
       canvas.height = 512;
       const ctx = canvas.getContext('2d');
@@ -60,6 +63,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
         ctx.font = '14px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('Pharmacy', 140, 135);
+      }
       if (signInData?.user) {
         setUser(signInData.user);
         toast.success(email === 'demo@nodeai.com' ? 'Demo account logged in successfully' : 'Logged in successfully');
@@ -139,6 +143,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
         <lineBasicMaterial color="#4a5568" opacity={0.3} transparent />
       </lineSegments>
       if (signInError) {
+        }
         // If login fails and it's a demo account, try to create it
         if (email === 'demo@nodeai.com' && signInError.message.includes('Invalid login credentials')) {
           console.log('Demo account not found, creating...');
@@ -169,6 +174,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
           // Regular login error
           throw signInError;
         }
+  )
 };
 
 export default MapLayer;
