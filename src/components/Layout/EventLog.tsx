@@ -26,18 +26,18 @@ const EventLog: React.FC = () => {
   return (
     <div className="bg-white border border-gray-300 rounded-lg flex flex-col h-full shadow-lg">
       <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        <div className="flex items-center space-x-3">
-          <div className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center">
-            <Activity className="w-4 h-4 text-black" />
+        <div className="flex items-center space-x-6">
+          <div className="w-5 h-5 bg-gray-50 rounded-lg flex items-center justify-center">
+            <Activity className="w-3 h-3 text-black" />
           </div>
-          <h3 className="text-base font-semibold text-black">Live Events</h3>
-          <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+          <h3 className="text-sm font-medium text-black">Live Events</h3>
+          <span className="text-xs text-gray-500 bg-gray-50 px-3 py-1 rounded-full">
             {recentTelemetry.length + events.length}
           </span>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-4">
           <div className="w-3 h-3 bg-black rounded-full animate-pulse" />
-          <span className="text-sm text-gray-600">Live</span>
+          <span className="text-xs text-gray-500">Live</span>
         </div>
       </div>
       

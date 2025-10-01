@@ -37,18 +37,18 @@ const RobotPanel: React.FC = () => {
   return (
     <div className="p-6 border-b border-gray-200">
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-            <Bot className="w-4 h-4 text-black" />
+        <div className="flex items-center space-x-6">
+          <div className="w-6 h-6 bg-gray-50 rounded-lg flex items-center justify-center">
+            <Bot className="w-3 h-3 text-black" />
           </div>
-          <h2 className="text-lg font-semibold text-black">Fleet</h2>
-          <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+          <h2 className="text-sm font-medium text-black">Fleet</h2>
+          <span className="text-xs text-gray-500 bg-gray-50 px-3 py-1 rounded-full">
             {siteRobots.length}
           </span>
         </div>
-        <div className="flex items-center space-x-2 text-sm">
+        <div className="flex items-center space-x-3 text-xs">
           <div className="w-3 h-3 bg-black rounded-full" />
-          <span className="text-gray-600">{siteRobots.filter(r => r.status === 'ACTIVE').length} active</span>
+          <span className="text-gray-500">{siteRobots.filter(r => r.status === 'ACTIVE').length} active</span>
         </div>
       </div>
       

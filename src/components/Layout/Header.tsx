@@ -33,70 +33,70 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-black border-b border-gray-300 px-8 py-6">
+    <header className="bg-white border-b border-gray-200 px-12 py-8">
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-6">
+        <div className="flex items-center space-x-8">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-3 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-4 text-gray-500 hover:text-black hover:bg-gray-50 rounded-lg transition-colors"
           >
-            <Settings className="w-5 h-5" />
+            <Settings className="w-4 h-4" />
           </button>
           
-          <div className="flex items-center space-x-4">
-            <Bot className="w-10 h-10 text-black" />
+          <div className="flex items-center space-x-6">
+            <Bot className="w-8 h-8 text-black" />
             <div>
-              <h1 className="text-2xl font-bold text-black">NodeAI</h1>
-              <p className="text-sm text-gray-600">Robot Mission Orchestration</p>
+              <h1 className="text-xl font-semibold text-black">NodeAI</h1>
+              <p className="text-xs text-gray-500 mt-1">Robot Mission Orchestration</p>
             </div>
           </div>
 
           {isDemoMode && (
-            <div className="px-4 py-2 bg-black text-white text-sm font-medium rounded-full">
+            <div className="px-4 py-2 bg-gray-100 text-black text-xs font-medium rounded-full border border-gray-200">
               Demo Mode
             </div>
           )}
         </div>
 
-        <div className="flex items-center space-x-8">
+        <div className="flex items-center space-x-12">
           {/* KPI Bar - Always Visible */}
-          <div className="flex items-center space-x-8 text-sm">
-            <div className="flex items-center space-x-3">
-              <Activity className="w-5 h-5 text-gray-600" />
-              <span className="text-gray-600">
-                Replans: <span className="text-black font-semibold">{safeKpi.replans_count}</span>
+          <div className="flex items-center space-x-10 text-xs">
+            <div className="flex items-center space-x-4">
+              <Activity className="w-4 h-4 text-gray-400" />
+              <span className="text-gray-500">
+                Replans: <span className="text-black font-medium">{safeKpi.replans_count}</span>
               </span>
             </div>
             
-            <div className="flex items-center space-x-3">
-              <CheckCircle className="w-5 h-5 text-gray-600" />
-              <span className="text-gray-600">
-                Interventions Saved: <span className="text-black font-semibold">{safeKpi.interventions_avoided}</span>
+            <div className="flex items-center space-x-4">
+              <CheckCircle className="w-4 h-4 text-gray-400" />
+              <span className="text-gray-500">
+                Interventions Saved: <span className="text-black font-medium">{safeKpi.interventions_avoided}</span>
               </span>
             </div>
             
-            <div className="flex items-center space-x-3">
-              <AlertTriangle className="w-5 h-5 text-gray-600" />
-              <span className="text-gray-600">
-                MTTR: <span className="text-black font-semibold">
+            <div className="flex items-center space-x-4">
+              <AlertTriangle className="w-4 h-4 text-gray-400" />
+              <span className="text-gray-500">
+                MTTR: <span className="text-black font-medium">
                   {Math.max(1, Math.round(safeKpi.mttr_ms_avg / 1000))}s
                 </span>
               </span>
             </div>
           </div>
 
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-8">
             <div className="text-right">
-              <p className="text-sm font-semibold text-black">{user?.email}</p>
-              <p className="text-xs text-gray-600">Mission Control</p>
+              <p className="text-xs font-medium text-black">{user?.email}</p>
+              <p className="text-xs text-gray-400 mt-1">Mission Control</p>
             </div>
             
             <button
               onClick={handleLogout}
-              className="p-3 text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-4 text-gray-500 hover:text-black hover:bg-gray-50 rounded-lg transition-colors"
               title="Logout"
             >
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
