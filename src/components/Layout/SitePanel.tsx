@@ -8,50 +8,50 @@ const SitePanel: React.FC = () => {
   const [showMapSettings, setShowMapSettings] = React.useState(false);
 
   return (
-    <div className="p-4 border-b border-slate-800/50">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-2">
-          <div className="w-6 h-6 bg-blue-500/20 rounded-lg flex items-center justify-center">
-            <Building2 className="w-3 h-3 text-blue-400" />
+    <div className="p-6 border-b border-gray-200">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-4">
+          <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+            <Building2 className="w-4 h-4 text-black" />
           </div>
-          <h2 className="text-sm font-semibold text-slate-300">Sites</h2>
-          <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-0.5 rounded-full">
+          <h2 className="text-lg font-semibold text-black">Sites</h2>
+          <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
             {sites.length}
           </span>
         </div>
         {currentSite && (
           <button
             onClick={() => setShowMapSettings(true)}
-            className="p-1.5 bg-blue-900/30 hover:bg-blue-800/40 rounded-lg transition-all duration-200 border border-blue-700/30 hover:border-blue-600/50"
+            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all duration-200 border border-gray-300"
             title="Map Settings"
           >
-            <Settings className="w-3.5 h-3.5 text-blue-300" />
+            <Settings className="w-4 h-4 text-black" />
           </button>
         )}
       </div>
       
-      <div className="space-y-2">
+      <div className="space-y-3">
         {sites.map((site) => (
           <button
             key={site.id}
             onClick={() => setCurrentSite(site.id)}
-            className={`w-full text-left p-3 rounded-lg transition-all duration-200 ${
+            className={`w-full text-left p-4 rounded-lg transition-all duration-200 ${
               currentSite === site.id
-                ? 'bg-gradient-to-r from-blue-900/40 to-blue-800/30 text-blue-200 border border-blue-700/50 shadow-lg'
-                : 'bg-slate-800/30 hover:bg-slate-800/50 text-slate-400 hover:text-slate-300 border border-transparent hover:border-slate-700/50'
+                ? 'bg-black text-white border border-black shadow-lg'
+                : 'bg-gray-50 hover:bg-gray-100 text-gray-700 hover:text-black border border-gray-200'
             }`}
           >
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-4">
               <div className={`w-2 h-2 rounded-full ${
-                currentSite === site.id ? 'bg-blue-400' : 'bg-slate-600'
+                currentSite === site.id ? 'bg-white' : 'bg-gray-400'
               }`} />
               <div className="flex-1">
-                <div className="font-medium text-sm">{site.name}</div>
-                <div className="text-xs opacity-60 font-mono mt-0.5">
+                <div className="font-semibold text-base">{site.name}</div>
+                <div className="text-sm opacity-60 font-mono mt-1">
                   {site.id}
                 </div>
               </div>
-              <MapPin className="w-4 h-4 opacity-40" />
+              <MapPin className="w-5 h-5 opacity-40" />
             </div>
           </button>
         ))}

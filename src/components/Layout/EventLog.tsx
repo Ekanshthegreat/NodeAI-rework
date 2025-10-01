@@ -24,59 +24,52 @@ const EventLog: React.FC = () => {
   const recentTelemetry = telemetryBuffer.slice(-50).reverse();
 
   return (
-    <div className="bg-slate-950/95 backdrop-blur-sm border border-slate-800/50 rounded-lg flex flex-col h-full shadow-lg">
-      <div className="flex items-center justify-between p-3 border-b border-slate-800/50">
-        <div className="flex items-center space-x-2">
-          <div className="w-5 h-5 bg-slate-700/50 rounded-lg flex items-center justify-center">
-            <Activity className="w-3 h-3 text-slate-400" />
+    <div className="bg-white border border-gray-300 rounded-lg flex flex-col h-full shadow-lg">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center space-x-3">
+          <div className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center">
+            <Activity className="w-4 h-4 text-black" />
           </div>
-          <h3 className="text-sm font-semibold text-slate-300">Live Events</h3>
-          <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-0.5 rounded-full">
+          <h3 className="text-base font-semibold text-black">Live Events</h3>
+          <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
             {recentTelemetry.length + events.length}
           </span>
         </div>
-        <div className="flex items-center space-x-2">
-          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-          <span className="text-xs text-slate-500">Live</span>
+        <div className="flex items-center space-x-3">
+          <div className="w-3 h-3 bg-black rounded-full animate-pulse" />
+          <span className="text-sm text-gray-600">Live</span>
         </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-3 space-y-1.5 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
         {recentTelemetry.map((telemetry, index) => (
-          <div key={`${telemetry.robot_id}-${telemetry.ts}-${index}`} className="flex items-center space-x-3 text-xs p-2 bg-slate-800/20 rounded-lg border border-slate-800/30">
-            <span className="text-slate-500 font-mono text-xs min-w-[60px]">
+          <div key={`${telemetry.robot_id}-${telemetry.ts}-${index}`} className="flex items-center space-x-4 text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <span className="text-gray-600 font-mono text-sm min-w-[70px]">
               {formatTime(telemetry.ts)}
             </span>
             
-            <div className={`w-2 h-2 rounded-full ${getStatusColor(telemetry.status).replace('text-', 'bg-')}`} />
+            <div className="w-3 h-3 rounded-full bg-black" />
             
-            <span className="text-blue-300 font-mono text-xs font-medium min-w-[60px]">
+            <span className="text-black font-mono text-sm font-semibold min-w-[70px]">
               {telemetry.robot_id}
             </span>
             
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-              telemetry.status === 'ACTIVE' ? 'bg-green-500/20 text-green-400' :
-              telemetry.status === 'CHARGING' ? 'bg-yellow-500/20 text-yellow-400' :
-              telemetry.status === 'ERROR' ? 'bg-red-500/20 text-red-400' :
-              'bg-slate-500/20 text-slate-400'
+            <span className={`text-sm font-semibold px-3 py-1 rounded-full ${
+              'bg-gray-200 text-black border border-gray-300'
             }`}>
               {telemetry.status}
             </span>
             
-            <span className="text-slate-400 text-xs font-mono">
+            <span className="text-gray-600 text-sm font-mono">
               ({telemetry.pose.x.toFixed(1)}, {telemetry.pose.y.toFixed(1)})
             </span>
             
-            <span className={`text-xs font-mono ${
-              telemetry.battery > 0.6 ? 'text-green-400' :
-              telemetry.battery > 0.3 ? 'text-yellow-400' :
-              'text-red-400'
-            }`}>
+            <span className="text-sm font-mono text-black">
               ⚡{Math.round(telemetry.battery * 100)}%
             </span>
             
             {telemetry.task_id && (
-              <span className="text-teal-300 text-xs font-mono bg-teal-500/20 px-2 py-0.5 rounded-full">
+              <span className="text-black text-sm font-mono bg-gray-200 px-3 py-1 rounded-full border border-gray-300">
                 {telemetry.task_id.slice(0, 8)}
               </span>
             )}
@@ -84,28 +77,26 @@ const EventLog: React.FC = () => {
         ))}
         
         {events.map((event) => (
-          <div key={event.id} className="flex items-center space-x-3 text-xs p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
-            <span className="text-slate-500 font-mono text-xs min-w-[60px]">
+          <div key={event.id} className="flex items-center space-x-4 text-sm p-3 bg-gray-100 rounded-lg border border-gray-300">
+            <span className="text-gray-600 font-mono text-sm min-w-[70px]">
               {new Date(event.ts).toLocaleTimeString()}
             </span>
             
             {event.payload?.reason ? (
-              <GitBranch className="w-3 h-3 text-orange-400" />
+              <GitBranch className="w-4 h-4 text-black" />
             ) : event.type === 'system' ? (
-              <AlertTriangle className="w-3 h-3 text-yellow-400" />
+              <AlertTriangle className="w-4 h-4 text-black" />
             ) : (
-              <Info className="w-3 h-3 text-blue-400" />
+              <Info className="w-4 h-4 text-black" />
             )}
             
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-              event.payload?.reason ? 'bg-orange-500/20 text-orange-400' :
-              event.type === 'system' ? 'bg-yellow-500/20 text-yellow-400' :
-              'bg-purple-500/20 text-purple-400'
+            <span className={`text-sm font-semibold px-3 py-1 rounded-full ${
+              'bg-gray-200 text-black border border-gray-300'
             }`}>
               {event.payload?.reason ? 'Auto-replan' : event.type}
             </span>
             
-            <div className="flex-1 text-slate-300 text-xs">
+            <div className="flex-1 text-black text-sm">
               {typeof event.payload === 'object' && event.payload?.msg ? 
                 event.payload.msg : 
                 (event as any).msg || 'System event'
@@ -115,9 +106,9 @@ const EventLog: React.FC = () => {
             {event.payload?.before && event.payload?.after && (
               <button
                 onClick={() => setSelectedDiff({ before: event.payload.before, after: event.payload.after })}
-                className="flex items-center space-x-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                className="flex items-center space-x-1 text-sm text-black hover:text-gray-700 transition-colors"
               >
-                <Eye className="w-3 h-3" />
+                <Eye className="w-4 h-4" />
                 <span>Diff</span>
               </button>
             )}
@@ -125,10 +116,10 @@ const EventLog: React.FC = () => {
         ))}
         
         {recentTelemetry.length === 0 && events.length === 0 && (
-          <div className="text-center text-slate-500 py-8">
-            <Activity className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No events yet</p>
-            <p className="text-xs opacity-60">Start a mission to see live updates</p>
+          <div className="text-center text-gray-500 py-12">
+            <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p className="text-base">No events yet</p>
+            <p className="text-sm opacity-60 mt-1">Start a mission to see live updates</p>
           </div>
         )}
       </div>

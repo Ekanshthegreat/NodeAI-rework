@@ -5,7 +5,7 @@ import Scene from './Scene';
 
 export const Canvas3D: React.FC = () => {
   return (
-    <div className="w-full h-full bg-slate-950 rounded-xl overflow-hidden relative shadow-2xl border border-slate-800/50">
+    <div className="w-full h-full bg-gray-100 rounded-xl overflow-hidden relative shadow-xl border border-gray-300">
       <Canvas
         camera={{
           position: [10, 10, 10],
@@ -13,10 +13,10 @@ export const Canvas3D: React.FC = () => {
           near: 0.1,
           far: 1000,
         }}
-        className="bg-gradient-to-br from-slate-950 to-slate-900"
+        className="bg-white"
         gl={{ antialias: true, alpha: false }}
         onCreated={({ gl }) => {
-          gl.setClearColor('#0f172a', 1);
+          gl.setClearColor('#ffffff', 1);
         }}
       >
         {/* Lighting */}
@@ -34,7 +34,7 @@ export const Canvas3D: React.FC = () => {
           fadeDistance={50}
           fadeStrength={1}
           materialProps={{
-            color: '#4a5568',
+            color: '#d1d5db',
             transparent: true,
             opacity: 0.4,
           }}

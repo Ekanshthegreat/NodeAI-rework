@@ -35,70 +35,70 @@ const RobotPanel: React.FC = () => {
   };
 
   return (
-    <div className="p-4 border-b border-slate-800/50">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-2">
-          <div className="w-6 h-6 bg-teal-500/20 rounded-lg flex items-center justify-center">
-            <Bot className="w-3 h-3 text-teal-400" />
+    <div className="p-6 border-b border-gray-200">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-4">
+          <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+            <Bot className="w-4 h-4 text-black" />
           </div>
-          <h2 className="text-sm font-semibold text-slate-300">Fleet</h2>
-          <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-0.5 rounded-full">
+          <h2 className="text-lg font-semibold text-black">Fleet</h2>
+          <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
             {siteRobots.length}
           </span>
         </div>
-        <div className="flex items-center space-x-1 text-xs">
-          <div className="w-2 h-2 bg-green-400 rounded-full" />
-          <span className="text-slate-400">{siteRobots.filter(r => r.status === 'ACTIVE').length} active</span>
+        <div className="flex items-center space-x-2 text-sm">
+          <div className="w-3 h-3 bg-black rounded-full" />
+          <span className="text-gray-600">{siteRobots.filter(r => r.status === 'ACTIVE').length} active</span>
         </div>
       </div>
       
-      <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+      <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
         {siteRobots.map((robot) => (
           <button
             key={robot.id}
             onClick={() => setSelectedRobot(robot.id === selectedRobot ? null : robot.id)}
-            className={`w-full text-left p-3 rounded-lg transition-all duration-200 ${
+            className={`w-full text-left p-4 rounded-lg transition-all duration-200 ${
               selectedRobot === robot.id
-                ? 'bg-gradient-to-r from-teal-900/40 to-teal-800/30 text-teal-200 border border-teal-700/50 shadow-lg'
-                : 'bg-slate-800/30 hover:bg-slate-800/50 text-slate-400 hover:text-slate-300 border border-transparent hover:border-slate-700/50'
+                ? 'bg-black text-white border border-black shadow-lg'
+                : 'bg-gray-50 hover:bg-gray-100 text-gray-700 hover:text-black border border-gray-200'
             }`}
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center space-x-2">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-3">
                 {getStatusIcon(robot.status)}
-                <span className="font-medium font-mono text-sm">{robot.id}</span>
+                <span className="font-semibold font-mono text-base">{robot.id}</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <div className={`flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-mono ${
-                  robot.battery > 0.6 ? 'bg-green-500/20 text-green-400' :
-                  robot.battery > 0.3 ? 'bg-yellow-500/20 text-yellow-400' :
-                  'bg-red-500/20 text-red-400'
+              <div className="flex items-center space-x-3">
+                <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-mono ${
+                  robot.battery > 0.6 ? 'bg-gray-100 text-black' :
+                  robot.battery > 0.3 ? 'bg-gray-200 text-black' :
+                  'bg-gray-300 text-black'
                 }`}>
-                  <Battery className="w-3 h-3" />
+                  <Battery className="w-4 h-4" />
                   <span>{Math.round(robot.battery * 100)}%</span>
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center space-x-2">
-                <span className={`px-2 py-0.5 rounded-full font-medium ${getStatusColor(robot.status)} bg-current bg-opacity-20`}>
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center space-x-3">
+                <span className={`px-3 py-1 rounded-full font-semibold border ${
+                  selectedRobot === robot.id ? 'bg-white text-black border-white' : 'bg-gray-100 text-black border-gray-200'
+                }`}>
                   {robot.status}
                 </span>
-                <span className="text-slate-500">{robot.vendor}</span>
+                <span className="opacity-60">{robot.vendor}</span>
               </div>
-              <span className="text-slate-500 font-mono">
+              <span className="opacity-60 font-mono">
                 ({robot.pose.x.toFixed(1)}, {robot.pose.y.toFixed(1)})
               </span>
             </div>
             
             {/* Battery level bar */}
-            <div className="mt-2">
-              <div className="w-full bg-slate-700/50 rounded-full h-1">
+            <div className="mt-3">
+              <div className="w-full bg-gray-200 rounded-full h-2">
                 <div 
-                  className={`h-1 rounded-full transition-all duration-300 ${
-                    robot.battery > 0.6 ? 'bg-green-400' :
-                    robot.battery > 0.3 ? 'bg-yellow-400' :
-                    'bg-red-400'
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    selectedRobot === robot.id ? 'bg-white' : 'bg-black'
                   }`}
                   style={{ width: `${robot.battery * 100}%` }}
                 />
@@ -108,10 +108,10 @@ const RobotPanel: React.FC = () => {
         ))}
         
         {siteRobots.length === 0 && (
-          <div className="text-center text-slate-500 py-8">
-            <Bot className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No robots deployed</p>
-            <p className="text-xs opacity-60">Add robots to this site</p>
+          <div className="text-center text-gray-500 py-12">
+            <Bot className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p className="text-base">No robots deployed</p>
+            <p className="text-sm opacity-60 mt-1">Add robots to this site</p>
           </div>
         )}
       </div>
