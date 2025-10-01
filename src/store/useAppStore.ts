@@ -1,24 +1,29 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type { Event, EventMessage, Site, Robot, Mission, TelemetryData, KPI } from '../types';
+import type { AdapterType } from '../adapters';
 
 interface AppState {
   // Authentication
   user: any;
   isAuthenticated: boolean;
-  
+
   // UI State
   sidebarOpen: boolean;
-  
+
   // Current selections
   currentSite: Site | null;
   selectedRobot: Robot | null;
   selectedMission: Mission | null;
-  
+
   // Connection state
   isRealtimeConnected: boolean;
   telemetryEnabled: boolean;
-  
+
+  // Adapter state
+  adapterType: AdapterType;
+  isAdapterConnected: boolean;
+
   // Data
   sites: Site[];
   robots: Robot[];
@@ -26,10 +31,10 @@ interface AppState {
   events: Event[];
   telemetryBuffer: TelemetryData[];
   kpi: KPI;
-  
+
   // Fault injection
   faultInjected: boolean;
-  
+
   // Actions
   setUser: (user: any) => void;
   setSidebarOpen: (open: boolean) => void;
@@ -38,6 +43,8 @@ interface AppState {
   setSelectedMission: (mission: Mission | null) => void;
   setRealtimeConnected: (connected: boolean) => void;
   setTelemetryEnabled: (enabled: boolean) => void;
+  setAdapter: (type: AdapterType) => void;
+  setAdapterConnected: (connected: boolean) => void;
   setSites: (sites: Site[]) => void;
   setRobots: (robots: Robot[]) => void;
   setMissions: (missions: Mission[]) => void;
@@ -60,6 +67,8 @@ export const useAppStore = create<AppState>()(
       selectedMission: null,
       isRealtimeConnected: false,
       telemetryEnabled: true,
+      adapterType: 'mock',
+      isAdapterConnected: false,
       sites: [],
       robots: [],
       missions: [],
@@ -104,7 +113,15 @@ export const useAppStore = create<AppState>()(
       setTelemetryEnabled: (enabled: boolean) => {
         set({ telemetryEnabled: enabled });
       },
-      
+
+      setAdapter: (type: AdapterType) => {
+        set({ adapterType: type });
+      },
+
+      setAdapterConnected: (connected: boolean) => {
+        set({ isAdapterConnected: connected });
+      },
+
       setSites: (sites: Site[]) => {
         set({ sites });
       },

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, Settings, Bot, Activity, AlertTriangle, CheckCircle } from 'lucide-react';
+import { LogOut, Settings, Bot, Activity, AlertTriangle, CheckCircle, Radio } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAppStore } from '../../store/useAppStore';
@@ -7,7 +7,15 @@ import { supabase, isUsingMockClient } from '../../lib/supabase';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
-  const { user, setUser, kpi, sidebarOpen, setSidebarOpen } = useAppStore();
+  const {
+    user,
+    setUser,
+    kpi,
+    sidebarOpen,
+    setSidebarOpen,
+    adapterType,
+    isAdapterConnected
+  } = useAppStore();
 
   const handleLogout = async () => {
     try {
@@ -56,6 +64,14 @@ const Header: React.FC = () => {
               Demo Mode
             </div>
           )}
+
+          <div className="flex items-center space-x-2 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
+            <Radio className="w-3 h-3 text-gray-500" />
+            <span className="text-xs text-gray-600 font-medium">
+              {adapterType.toUpperCase()}
+            </span>
+            <div className={`w-2 h-2 rounded-full ${isAdapterConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
+          </div>
         </div>
 
         <div className="flex items-center space-x-12">

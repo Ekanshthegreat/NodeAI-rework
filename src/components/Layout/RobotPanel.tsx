@@ -86,7 +86,11 @@ const RobotPanel: React.FC = () => {
                 }`}>
                   {robot.status}
                 </span>
-                <span className="opacity-60">{robot.vendor}</span>
+                <span className={`px-2 py-1 text-xs rounded border ${
+                  selectedRobot === robot.id ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-600 border-gray-300'
+                }`}>
+                  {robot.vendor.toUpperCase()}
+                </span>
               </div>
               <span className="opacity-60 font-mono">
                 ({robot.pose.x.toFixed(1)}, {robot.pose.y.toFixed(1)})
