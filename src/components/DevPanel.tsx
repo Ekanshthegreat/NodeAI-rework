@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Settings, Zap, AlertTriangle, Radio } from 'lucide-react';
+import { Settings, Zap, AlertTriangle, Radio, Activity } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { adapters } from '../adapters';
 import type { AdapterType } from '../adapters';
@@ -14,6 +14,7 @@ const DevPanel: React.FC = () => {
     adapterType,
     setAdapter,
     setAdapterConnected,
+    adapterConnectionStatus,
     addEvent,
     setRobots,
     robots
@@ -39,7 +40,6 @@ const DevPanel: React.FC = () => {
                     pose: telemetry.pose,
                     battery: telemetry.battery,
                     status: telemetry.status,
-                    vendor: telemetry.vendor,
                     updated_at: new Date(telemetry.ts).toISOString()
                   }
                 : r
@@ -68,6 +68,82 @@ const DevPanel: React.FC = () => {
     }
   };
 
+  const handlePing = async () => {
+    addEvent({
+      ts: Date.now(),
+      level: 'INFO',
+      msg: `[PING] Testing ${adapterType.toUpperCase()} adapter...`,
+      payload: { adapter: adapterType }
+    });
+
+    toast.promise(
+      new Promise((resolve, reject) => {
+        setTimeout(() => {
+          if (adapterConnectionStatus[adapterType]) {
+            resolve('Adapter is connected');
+          } else {
+            reject(new Error('Adapter not connected'));
+          }
+        }, 500);
+      }),
+      {
+        loading: 'Pinging adapter...',
+        success: `${adapterType.toUpperCase()} adapter is alive`,
+        error: `${adapterType.toUpperCase()} adapter not responding`
+      }
+    );
+  };
+
+  const handlePublishSampleOrder = async () => {
+    if (adapterType !== 'vda5050') {
+      toast.error('Sample order only available for VDA-5050 adapter');
+      return;
+    }
+
+    const sampleMission = {
+      mission_id: 'test-' + Date.now(),
+      site_id: 'test-site',
+      natural_language: 'Test navigation mission',
+      constraints: {
+        priority: 'normal' as const,
+        no_go: [],
+        time_window_start: null,
+        time_window_end: null,
+        min_battery_pct: 0.2
+      },
+      subtasks: [{
+        id: 'nav-1',
+        verb: 'navigate' as const,
+        args: {
+          from: null,
+          to: 'test-location',
+          item: null,
+          room: null,
+          zone: null,
+          dock: null
+        },
+        policy: {
+          reassign_on_blocked_s: 30,
+          retry_limit: 3
+        }
+      }],
+      robot_selection: {
+        strategy: 'auto' as const,
+        allow_vendors: ['vda5050'],
+        include: [],
+        exclude: []
+      }
+    };
+
+    try {
+      const adapter = adapters.vda5050;
+      await adapter.sendMission(sampleMission);
+      toast.success('Sample VDA-5050 order published');
+    } catch (error) {
+      toast.error(`Failed to publish: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
   useEffect(() => {
     const adapter = adapters[adapterType];
     adapter.subscribe(
@@ -80,7 +156,6 @@ const DevPanel: React.FC = () => {
                   pose: telemetry.pose,
                   battery: telemetry.battery,
                   status: telemetry.status,
-                  vendor: telemetry.vendor,
                   updated_at: new Date(telemetry.ts).toISOString()
                 }
               : r
@@ -98,6 +173,13 @@ const DevPanel: React.FC = () => {
       adapter.disconnect();
     };
   }, []);
+
+  const adapterOptions: Array<{ value: AdapterType; label: string }> = [
+    { value: 'mock', label: 'Mock' },
+    { value: 'ros', label: 'ROS2' },
+    { value: 'rmf', label: 'RMF' },
+    { value: 'vda5050', label: 'VDA-5050' }
+  ];
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -118,11 +200,47 @@ const DevPanel: React.FC = () => {
             onChange={(e) => handleAdapterChange(e.target.value as AdapterType)}
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="mock">Mock (Simulation)</option>
-            <option value="ros">ROS2 (WebSocket)</option>
-            <option value="rmf">Open-RMF</option>
-            <option value="vda5050">VDA 5050</option>
+            {adapterOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label} {adapterConnectionStatus[opt.value] ? '•' : '○'}
+              </option>
+            ))}
           </select>
+        </div>
+
+        {/* Connection Status */}
+        <div className="bg-gray-50 rounded p-3 space-y-2">
+          <div className="text-xs font-medium text-gray-600 mb-2">Connection Status</div>
+          {adapterOptions.map(opt => (
+            <div key={opt.value} className="flex items-center justify-between text-xs">
+              <span className="text-gray-600">{opt.label}</span>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${adapterConnectionStatus[opt.value] ? 'bg-green-500' : 'bg-gray-300'}`} />
+                <span className={adapterConnectionStatus[opt.value] ? 'text-green-600' : 'text-gray-400'}>
+                  {adapterConnectionStatus[opt.value] ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Adapter Actions */}
+        <div className="flex gap-2">
+          <button
+            onClick={handlePing}
+            className="flex-1 px-3 py-2 text-xs font-medium text-blue-600 border border-blue-300 rounded hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <Activity className="w-3 h-3" />
+            Ping Adapter
+          </button>
+          {adapterType === 'vda5050' && (
+            <button
+              onClick={handlePublishSampleOrder}
+              className="flex-1 px-3 py-2 text-xs font-medium text-green-600 border border-green-300 rounded hover:bg-green-50 transition-colors"
+            >
+              Sample Order
+            </button>
+          )}
         </div>
 
         {/* Telemetry Control */}

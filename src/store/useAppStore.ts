@@ -23,6 +23,7 @@ interface AppState {
   // Adapter state
   adapterType: AdapterType;
   isAdapterConnected: boolean;
+  adapterConnectionStatus: Record<AdapterType, boolean>;
 
   // Data
   sites: Site[];
@@ -45,6 +46,7 @@ interface AppState {
   setTelemetryEnabled: (enabled: boolean) => void;
   setAdapter: (type: AdapterType) => void;
   setAdapterConnected: (connected: boolean) => void;
+  setAdapterConnectionStatus: (type: AdapterType, connected: boolean) => void;
   setSites: (sites: Site[]) => void;
   setRobots: (robots: Robot[]) => void;
   setMissions: (missions: Mission[]) => void;
@@ -69,6 +71,12 @@ export const useAppStore = create<AppState>()(
       telemetryEnabled: true,
       adapterType: 'mock',
       isAdapterConnected: false,
+      adapterConnectionStatus: {
+        mock: false,
+        ros: false,
+        rmf: false,
+        vda5050: false
+      },
       sites: [],
       robots: [],
       missions: [],
@@ -119,7 +127,24 @@ export const useAppStore = create<AppState>()(
       },
 
       setAdapterConnected: (connected: boolean) => {
-        set({ isAdapterConnected: connected });
+        const { adapterType, adapterConnectionStatus } = get();
+        set({
+          isAdapterConnected: connected,
+          adapterConnectionStatus: {
+            ...adapterConnectionStatus,
+            [adapterType]: connected
+          }
+        });
+      },
+
+      setAdapterConnectionStatus: (type: AdapterType, connected: boolean) => {
+        const { adapterConnectionStatus } = get();
+        set({
+          adapterConnectionStatus: {
+            ...adapterConnectionStatus,
+            [type]: connected
+          }
+        });
       },
 
       setSites: (sites: Site[]) => {
