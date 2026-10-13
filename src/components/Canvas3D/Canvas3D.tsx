@@ -7,6 +7,9 @@ export const Canvas3D: React.FC = () => {
   return (
     <div className="w-full h-full bg-gray-100 rounded-xl overflow-hidden relative shadow-xl border border-gray-300">
       <Canvas
+        fallback={
+          <p className="empty-state">WebGL is unavailable. Switch to the 2D map to continue.</p>
+        }
         camera={{
           position: [10, 10, 10],
           fov: 50,

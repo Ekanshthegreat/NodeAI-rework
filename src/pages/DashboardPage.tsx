@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { Component, useState, lazy, Suspense, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Dialog } from '@headlessui/react';
 import { Play, Pause, Square, Plus, AlertTriangle, RotateCcw } from 'lucide-react';
@@ -8,6 +8,21 @@ import FleetMap from '../components/FleetMap';
 const Canvas3D = lazy(() =>
   import('../components/Canvas3D/Canvas3D').then((m) => ({ default: m.Canvas3D }))
 );
+class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? (
+      <p className="empty-state" role="status">
+        The 3D view could not load. Switch to the 2D map to continue.
+      </p>
+    ) : (
+      this.props.children
+    );
+  }
+}
 const example = 'Deliver supplies from Pharmacy to Ward A';
 const message = (error: unknown) => (error instanceof Error ? error.message : 'Operation failed');
 export default function DashboardPage() {
@@ -92,9 +107,11 @@ export default function DashboardPage() {
             />
           ) : (
             <div className="three-view">
-              <Suspense fallback={<p className="empty-state">Loading 3D view…</p>}>
-                <Canvas3D />
-              </Suspense>
+              <SceneBoundary>
+                <Suspense fallback={<p className="empty-state">Loading 3D view…</p>}>
+                  <Canvas3D />
+                </Suspense>
+              </SceneBoundary>
             </div>
           )}
           <p className="map-caption">

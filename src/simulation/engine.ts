@@ -364,7 +364,7 @@ export function tickFleet(state: FleetState): FleetState {
       continue;
     }
     m.activeMs += TICK_MS;
-    if (m.activeMs > TIMEOUT_MS) {
+    if (m.activeMs >= TIMEOUT_MS) {
       finish(s, m, 'failed', 'Mission exceeded the two-minute simulation limit');
       continue;
     }

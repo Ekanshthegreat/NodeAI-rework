@@ -149,3 +149,18 @@ describe('battery service and bounded retention', () => {
     expect(s.recordings.M001).toBeDefined();
   });
 });
+
+describe('recovery disabled', () => {
+  it('keeps a blocked mission assigned until its active-time deadline then releases it', () => {
+    let s = submitMission({ ...createDemoState(0), selfHealing: false }, delivery);
+    s = injectFault(s, s.missions[0].robotId, 'BLOCKED');
+    s = advance(s, 1199);
+    expect(s.missions[0].status).toBe('active');
+    expect(s.missions[0].robotId).toBe('AGV-001');
+    s = tickFleet(s);
+    expect(s.missions[0].status).toBe('failed');
+    expect(s.missions[0].error).toContain('two-minute');
+    expect(s.missions[0].retries).toBe(0);
+    expect(s.recordings.M001.frames.at(-1)?.status).toBe('failed');
+  });
+});
