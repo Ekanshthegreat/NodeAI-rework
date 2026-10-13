@@ -1,347 +1,94 @@
 import { resolveAnchor } from './anchors';
+import type { MissionPlan } from '../types';
 
-export interface Obstacle {
-  id: string;
-  rect: { x: number; y: number; w: number; h: number };
-}
-
-export interface NoGo {
-  id: string;
-  poly: Array<{ x: number; y: number }>;
-}
-
-export interface PathPoint {
-  x: number;
-  y: number;
-  theta: number;
-}
-
+export interface Obstacle { id: string; rect: { x: number; y: number; w: number; h: number } }
+export interface NoGo { id: string; poly: Array<{ x: number; y: number }> }
+export interface PathPoint { x: number; y: number; theta: number }
+type Point = { x: number; y: number };
 export interface PlanPathOptions {
-  start: { x: number; y: number };
-  goal: { x: number; y: number };
-  obstacles?: Obstacle[];
-  noGo?: NoGo[];
+  start: Point; goal: Point; obstacles?: Obstacle[]; noGo?: NoGo[];
   resolutionMeters?: number;
   mapBounds?: { minX: number; maxX: number; minY: number; maxY: number };
 }
 
-// Simple A* implementation for coarse grid pathfinding
-export function planPath(options: PlanPathOptions): PathPoint[] {
-  const {
-    start,
-    goal,
-    obstacles = [],
-    noGo = [],
-    resolutionMeters = 0.5,
-    mapBounds = { minX: -10, maxX: 10, minY: -10, maxY: 10 },
-  } = options;
-
-  // Create grid
-  const gridWidth = Math.ceil((mapBounds.maxX - mapBounds.minX) / resolutionMeters);
-  const gridHeight = Math.ceil((mapBounds.maxY - mapBounds.minY) / resolutionMeters);
-  
-  // Convert world coordinates to grid coordinates
-  const worldToGrid = (x: number, y: number) => ({
-    x: Math.floor((x - mapBounds.minX) / resolutionMeters),
-    y: Math.floor((y - mapBounds.minY) / resolutionMeters),
-  });
-  
-  const gridToWorld = (gx: number, gy: number) => ({
-    x: mapBounds.minX + gx * resolutionMeters,
-    y: mapBounds.minY + gy * resolutionMeters,
-  });
-  
-  // Check if a grid cell is blocked
-  const isBlocked = (gx: number, gy: number): boolean => {
-    if (gx < 0 || gx >= gridWidth || gy < 0 || gy >= gridHeight) return true;
-    
-    const world = gridToWorld(gx, gy);
-    
-    // Check obstacles
-    for (const obstacle of obstacles) {
-      const { x, y, w, h } = obstacle.rect;
-      if (world.x >= x && world.x <= x + w && world.y >= y && world.y <= y + h) {
-        return true;
-      }
-    }
-    
-    // Check no-go zones (simplified point-in-polygon)
-    for (const zone of noGo) {
-      if (pointInPolygon(world, zone.poly)) {
-        return true;
-      }
-    }
-    
-    return false;
-  };
-  
-  const startGrid = worldToGrid(start.x, start.y);
-  const goalGrid = worldToGrid(goal.x, goal.y);
-  
-  // A* algorithm
-  interface Node {
-    x: number;
-    y: number;
-    g: number;
-    h: number;
-    f: number;
-    parent: Node | null;
-  }
-  
-  const openSet: Node[] = [];
-  const closedSet = new Set<string>();
-  
-  const heuristic = (a: { x: number; y: number }, b: { x: number; y: number }) =>
-    Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-  
-  const startNode: Node = {
-    x: startGrid.x,
-    y: startGrid.y,
-    g: 0,
-    h: heuristic(startGrid, goalGrid),
-    f: 0,
-    parent: null,
-  };
-  startNode.f = startNode.g + startNode.h;
-  
-  openSet.push(startNode);
-  
-  const neighbors = [
-    [-1, -1], [-1, 0], [-1, 1],
-    [0, -1],           [0, 1],
-    [1, -1],  [1, 0],  [1, 1],
-  ];
-  
-  while (openSet.length > 0) {
-    // Find node with lowest f score
-    let current = openSet[0];
-    let currentIndex = 0;
-    
-    for (let i = 1; i < openSet.length; i++) {
-      if (openSet[i].f < current.f) {
-        current = openSet[i];
-        currentIndex = i;
-      }
-    }
-    
-    openSet.splice(currentIndex, 1);
-    closedSet.add(`${current.x},${current.y}`);
-    
-    // Check if we reached the goal
-    if (current.x === goalGrid.x && current.y === goalGrid.y) {
-      // Reconstruct path
-      const path: { x: number; y: number }[] = [];
-      let node: Node | null = current;
-      
-      while (node) {
-        const world = gridToWorld(node.x, node.y);
-        path.unshift(world);
-        node = node.parent;
-      }
-      
-      // Smooth path and add headings
-      const smoothed = smoothPath(path);
-      return addHeadingsToPath(smoothed);
-    }
-    
-    // Check neighbors
-    for (const [dx, dy] of neighbors) {
-      const nx = current.x + dx;
-      const ny = current.y + dy;
-      
-      if (isBlocked(nx, ny) || closedSet.has(`${nx},${ny}`)) {
-        continue;
-      }
-      
-      const g = current.g + Math.sqrt(dx * dx + dy * dy);
-      const h = heuristic({ x: nx, y: ny }, goalGrid);
-      const f = g + h;
-      
-      // Check if this path to neighbor is better
-      const existingIndex = openSet.findIndex(n => n.x === nx && n.y === ny);
-      
-      if (existingIndex === -1) {
-        openSet.push({
-          x: nx,
-          y: ny,
-          g,
-          h,
-          f,
-          parent: current,
-        });
-      } else if (g < openSet[existingIndex].g) {
-        openSet[existingIndex].g = g;
-        openSet[existingIndex].f = f;
-        openSet[existingIndex].parent = current;
-      }
-    }
-  }
-  
-  // No path found, return direct line
-  console.warn('No path found, using direct line');
-  return addHeadingsToPath([start, goal]);
+function onSegment(p: Point, a: Point, b: Point): boolean {
+  const cross = (p.y-a.y)*(b.x-a.x)-(p.x-a.x)*(b.y-a.y);
+  return Math.abs(cross)<1e-9 && p.x>=Math.min(a.x,b.x)-1e-9 && p.x<=Math.max(a.x,b.x)+1e-9 && p.y>=Math.min(a.y,b.y)-1e-9 && p.y<=Math.max(a.y,b.y)+1e-9;
 }
-
-// Simplified Ramer-Douglas-Peucker algorithm
-export function smoothPath(points: { x: number; y: number }[]): { x: number; y: number }[] {
-  if (points.length <= 2) return points;
-  
-  const epsilon = 0.3; // meters
-  
-  const rdp = (pts: { x: number; y: number }[], start: number, end: number): { x: number; y: number }[] => {
-    if (end - start <= 1) return [pts[start], pts[end]];
-    
-    let maxDist = 0;
-    let maxIndex = start;
-    
-    for (let i = start + 1; i < end; i++) {
-      const dist = pointToLineDistance(pts[i], pts[start], pts[end]);
-      if (dist > maxDist) {
-        maxDist = dist;
-        maxIndex = i;
-      }
-    }
-    
-    if (maxDist > epsilon) {
-      const left = rdp(pts, start, maxIndex);
-      const right = rdp(pts, maxIndex, end);
-      return [...left.slice(0, -1), ...right];
-    }
-    
-    return [pts[start], pts[end]];
-  };
-  
-  return rdp(points, 0, points.length - 1);
+function intersects(a: Point,b: Point,c: Point,d: Point): boolean {
+  const turn=(p: Point,q: Point,r: Point)=>(q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x);
+  return (turn(a,b,c)*turn(a,b,d)<0 && turn(c,d,a)*turn(c,d,b)<0) || onSegment(c,a,b) || onSegment(d,a,b) || onSegment(a,c,d) || onSegment(b,c,d);
 }
-
-export function addHeadingsToPath(points: { x: number; y: number }[]): PathPoint[] {
-  if (points.length === 0) return [];
-  if (points.length === 1) return [{ ...points[0], theta: 0 }];
-  
-  const result: PathPoint[] = [];
-  
-  for (let i = 0; i < points.length; i++) {
-    let theta = 0;
-    
-    if (i < points.length - 1) {
-      // Use direction to next point
-      const dx = points[i + 1].x - points[i].x;
-      const dy = points[i + 1].y - points[i].y;
-      theta = Math.atan2(dy, dx);
-    } else {
-      // Last point, use direction from previous point
-      const dx = points[i].x - points[i - 1].x;
-      const dy = points[i].y - points[i - 1].y;
-      theta = Math.atan2(dy, dx);
-    }
-    
-    result.push({ ...points[i], theta });
+function inPolygon(p: Point, poly: Point[]): boolean {
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++) {
+    const a=poly[i],b=poly[j];
+    if(onSegment(p,a,b)) return true;
+    if((a.y>p.y)!==(b.y>p.y) && p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x) inside=!inside;
   }
-  
-  return result;
-}
-
-// Helper functions
-function pointInPolygon(point: { x: number; y: number }, polygon: { x: number; y: number }[]): boolean {
-  let inside = false;
-  
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    if (
-      polygon[i].y > point.y !== polygon[j].y > point.y &&
-      point.x < ((polygon[j].x - polygon[i].x) * (point.y - polygon[i].y)) / (polygon[j].y - polygon[i].y) + polygon[i].x
-    ) {
-      inside = !inside;
-    }
-  }
-  
   return inside;
 }
-
-function pointToLineDistance(
-  point: { x: number; y: number },
-  lineStart: { x: number; y: number },
-  lineEnd: { x: number; y: number }
-): number {
-  const A = point.x - lineStart.x;
-  const B = point.y - lineStart.y;
-  const C = lineEnd.x - lineStart.x;
-  const D = lineEnd.y - lineStart.y;
-  
-  const dot = A * C + B * D;
-  const lenSq = C * C + D * D;
-  
-  if (lenSq === 0) return Math.sqrt(A * A + B * B);
-  
-  let param = dot / lenSq;
-  
-  let xx, yy;
-  
-  if (param < 0) {
-    xx = lineStart.x;
-    yy = lineStart.y;
-  } else if (param > 1) {
-    xx = lineEnd.x;
-    yy = lineEnd.y;
-  } else {
-    xx = lineStart.x + param * C;
-    yy = lineStart.y + param * D;
-  }
-  
-  const dx = point.x - xx;
-  const dy = point.y - yy;
-  
-  return Math.sqrt(dx * dx + dy * dy);
+export function isSegmentClear(a: Point,b: Point,obstacles: Obstacle[]=[],noGo: NoGo[]=[]): boolean {
+  const polygons=[...obstacles.map(({rect:r})=>[{x:r.x,y:r.y},{x:r.x+r.w,y:r.y},{x:r.x+r.w,y:r.y+r.h},{x:r.x,y:r.y+r.h}]),...noGo.map(z=>z.poly)];
+  return polygons.every(poly=>!inPolygon(a,poly) && !inPolygon(b,poly) && poly.every((p,i)=>!intersects(a,b,p,poly[(i+1)%poly.length])));
 }
 
-// Mission path compilation
-export function compileMissionPath(
-  _mission: any,
-  plan: any,
-  robotPose: { x: number; y: number },
-  obstacles: Obstacle[] = [],
-  noGo: NoGo[] = []
-): PathPoint[] {
-  const waypoints: PathPoint[] = [];
-  let currentPos = robotPose;
-  
-  for (const subtask of plan.subtasks) {
-    let targetPos: { x: number; y: number } | null = null;
-    
-    // Resolve target location
-    if (subtask.args.to) {
-      targetPos = resolveAnchor(subtask.args.to);
-    } else if (subtask.args.from) {
-      targetPos = resolveAnchor(subtask.args.from);
-    } else if (subtask.args.dock) {
-      targetPos = resolveAnchor(subtask.args.dock);
-    } else if (subtask.args.room) {
-      targetPos = resolveAnchor(subtask.args.room);
-    } else if (subtask.args.zone) {
-      targetPos = resolveAnchor(subtask.args.zone);
+/** Four-neighbour A*: Manhattan heuristic, no corner cutting or unsafe fallback. */
+export function planPath({start,goal,obstacles=[],noGo=[],resolutionMeters:r=0.5,mapBounds:b={minX:-10,maxX:10,minY:-10,maxY:10}}: PlanPathOptions): PathPoint[] {
+  if(![start.x,start.y,goal.x,goal.y,r,b.minX,b.maxX,b.minY,b.maxY].every(Number.isFinite) || r<=0 || b.maxX<=b.minX || b.maxY<=b.minY) throw new Error('Invalid route coordinates or grid settings');
+  const within=(p: Point)=>p.x>=b.minX && p.x<=b.maxX && p.y>=b.minY && p.y<=b.maxY;
+  if(!within(start)||!within(goal)) throw new Error('Route endpoint is outside the map');
+  if(!isSegmentClear(start,start,obstacles,noGo)||!isSegmentClear(goal,goal,obstacles,noGo)) throw new Error('Route endpoint is blocked');
+  const width=Math.floor((b.maxX-b.minX)/r)+1,height=Math.floor((b.maxY-b.minY)/r)+1;
+  if(width*height>50000) throw new Error('Route grid is too large');
+  const cell=(p: Point)=>({x:Math.round((p.x-b.minX)/r),y:Math.round((p.y-b.minY)/r)});
+  const world=(x: number,y: number)=>({x:b.minX+x*r,y:b.minY+y*r});
+  const key=(x: number,y: number)=>`${x},${y}`;
+  const s=cell(start),g=cell(goal);
+  const sw=world(s.x,s.y),gw=world(g.x,g.y);
+  if(!isSegmentClear(start,sw,obstacles,noGo)||!isSegmentClear(gw,goal,obstacles,noGo)) throw new Error('Endpoint cannot connect to the routing grid');
+  type Node={x:number;y:number;cost:number;score:number;parent:Node|null};
+  const heuristic=(x:number,y:number)=>Math.abs(x-g.x)+Math.abs(y-g.y);
+  const open:Node[]=[{...s,cost:0,score:heuristic(s.x,s.y),parent:null}];
+  const best=new Map<string,number>([[key(s.x,s.y),0]]);
+  const closed=new Set<string>();
+  while(open.length) {
+    open.sort((a,b)=>a.score-b.score || a.cost-b.cost);
+    const node=open.shift()!;
+    if(closed.has(key(node.x,node.y))) continue;
+    if(node.x===g.x && node.y===g.y) {
+      const points:Point[]=[];let cursor:Node|null=node;
+      while(cursor){points.unshift(world(cursor.x,cursor.y));cursor=cursor.parent;}
+      points.unshift(start);points.push(goal);
+      const unique=points.filter((p,i)=>i===0 || p.x!==points[i-1].x || p.y!==points[i-1].y);
+      return addHeadingsToPath(smoothPath(unique));
     }
-    
-    if (!targetPos) {
-      console.warn(`Could not resolve target for subtask ${subtask.id}, using fallback`);
-      targetPos = { x: 0, y: 0 }; // Fallback to origin
+    closed.add(key(node.x,node.y));
+    for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const x=node.x+dx,y=node.y+dy,k=key(x,y),cost=node.cost+1;
+      if(x<0||y<0||x>=width||y>=height||closed.has(k)||cost>=(best.get(k)??Infinity)) continue;
+      if(!isSegmentClear(world(node.x,node.y),world(x,y),obstacles,noGo)) continue;
+      best.set(k,cost);open.push({x,y,cost,score:cost+heuristic(x,y),parent:node});
     }
-    
-    // Plan path segment
-    const segmentPath = planPath({
-      start: currentPos,
-      goal: targetPos,
-      obstacles,
-      noGo,
-    });
-    
-    // Add segment to overall path (skip first point if not the first segment)
-    if (waypoints.length === 0) {
-      waypoints.push(...segmentPath);
-    } else {
-      waypoints.push(...segmentPath.slice(1));
-    }
-    
-    currentPos = targetPos;
   }
-  
+  throw new Error('No reachable route to the requested location');
+}
+
+/** Remove only collinear vertices; do not smooth a safe path through obstacles. */
+export function smoothPath(points: Point[]): Point[] {
+  return points.filter((p,i)=>i===0||i===points.length-1||!onSegment(p,points[i-1],points[i+1]));
+}
+export function addHeadingsToPath(points: Point[]): PathPoint[] {
+  return points.map((p,i)=>{const next=points[i+1]??p,prev=points[i-1]??p;return {...p,theta:Math.atan2(next.y-prev.y,next.x-prev.x)};});
+}
+export function compileMissionPath(_mission: unknown,plan: MissionPlan,robotPose: Point,obstacles: Obstacle[]=[],noGo: NoGo[]=[]): PathPoint[] {
+  const waypoints:PathPoint[]=[];let position=robotPose;
+  for(const task of plan.subtasks) {
+    const name=task.args.to??task.args.from??task.args.dock??task.args.room??task.args.zone;
+    const target=name?resolveAnchor(name):null;
+    if(!target) throw new Error(`Unknown mission location: ${name??'(missing)'}`);
+    const segment=planPath({start:position,goal:target,obstacles,noGo});
+    waypoints.push(...(waypoints.length?segment.slice(1):segment));position=target;
+  }
   return waypoints;
 }
