@@ -32,7 +32,9 @@ export default function App() {
           path="/app/ros"
           element={
             <div className="app-shell">
-              <RosPage />
+              <main className="workspace">
+                <RosPage />
+              </main>
             </div>
           }
         />

@@ -30,7 +30,12 @@ const robot = z.object({
   state: z.union([navigationState, z.literal('idle')]),
 });
 export const BridgeMessage = z.discriminatedUnion('type', [
-  z.object({ version: z.literal(1), type: z.literal('hello'), robots: z.array(id).max(32) }),
+  z.object({
+    version: z.literal(1),
+    type: z.literal('hello'),
+    mode: z.enum(['ros', 'test_fixture']).optional(),
+    robots: z.array(id).max(32),
+  }),
   z.object({ version: z.literal(1), type: z.literal('robots'), robots: z.array(robot).max(32) }),
   z.object({
     version: z.literal(1),

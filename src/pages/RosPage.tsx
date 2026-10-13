@@ -10,13 +10,15 @@ export default function RosPage() {
     [selected, setSelected] = useState(''),
     [events, setEvents] = useState<BridgeMessage[]>([]);
   const [target, setTarget] = useState({ x: '1', y: '2', yaw: '0' }),
-    [pending, setPending] = useState<string | null>(null);
+    [pending, setPending] = useState<Record<string, string>>({});
   const [lastHeartbeat, setLastHeartbeat] = useState(0),
     [now, setNow] = useState(Date.now());
+  const [mode, setMode] = useState<'ros' | 'test_fixture'>('ros');
   const client = useRef<BridgeClient | null>(null);
   useEffect(() => {
     client.current = new BridgeClient(
       (message) => {
+        if (message.type === 'hello') setMode(message.mode ?? 'ros');
         if (message.type === 'robots') {
           setRobots(message.robots);
           setLastHeartbeat(Date.now());
@@ -25,20 +27,38 @@ export default function RosPage() {
           );
         }
         if (message.type === 'navigation' || message.type === 'error') {
-          setEvents((current) => [message, ...current].slice(0, 30));
+          setEvents((current) =>
+            [
+              message,
+              ...current.filter(
+                (event) =>
+                  !(
+                    message.type === 'navigation' &&
+                    event.type === 'navigation' &&
+                    event.state === message.state &&
+                    event.error === message.error &&
+                    event.request_id === message.request_id
+                  )
+              ),
+            ].slice(0, 30)
+          );
           if (message.type === 'error') setError(message.message);
           if (
             message.type === 'error' ||
             ['succeeded', 'cancelled', 'rejected', 'failed'].includes(message.state)
           )
-            setPending((current) => (current === message.request_id ? null : current));
+            setPending((current) =>
+              Object.fromEntries(
+                Object.entries(current).filter(([, request]) => request !== message.request_id)
+              )
+            );
         }
       },
       (active) => {
         setConnected(active);
         if (!active) {
           setRobots([]);
-          setPending(null);
+          setPending({});
         }
       },
       setError
@@ -51,7 +71,7 @@ export default function RosPage() {
   }, []);
   const robot = robots.find((r) => r.id === selected),
     fresh = connected && now - lastHeartbeat < 3000;
-  const activeRequest = robot?.request_id ?? pending;
+  const activeRequest = robot?.request_id ?? pending[selected];
   const connect = async () => {
     setConnecting(true);
     setError('');
@@ -72,7 +92,7 @@ export default function RosPage() {
         { x: Number(target.x), y: Number(target.y), yaw: Number(target.yaw) },
         id
       );
-      setPending(id);
+      setPending((current) => ({ ...current, [selected]: id }));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -81,7 +101,9 @@ export default function RosPage() {
     <div className="dashboard">
       <header className="page-heading">
         <div>
-          <p className="eyebrow">ROS 2 / Nav2</p>
+          <p className="eyebrow">
+            {mode === 'test_fixture' ? 'ROS 2 action test fixture' : 'ROS 2 / Nav2'}
+          </p>
           <h1>ROS mission control</h1>
           <p>Live localization, battery state and navigation action results.</p>
         </div>

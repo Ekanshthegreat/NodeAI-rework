@@ -20,3 +20,13 @@ jobs:
       - run: npm run lint
       - run: npm run test:run
       - run: npm run build
+
+  ros:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ROS Jazzy package
+        run: docker build -f ros2/Dockerfile -t nodeai-ros-test .
+      - name: Test real ROS actions and bridge transport
+        run: docker run --rm nodeai-ros-test
