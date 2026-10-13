@@ -15,6 +15,7 @@ from rclpy.executors import (
     ExternalShutdownException,
 )
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from sensor_msgs.msg import BatteryState
@@ -225,3 +226,23 @@ def test_websocket_command_reaches_real_ros_action(bridge):
 
     asyncio.run(scenario())
     # The fixture shuts down rclpy, which exits the transport loop.
+
+
+def test_paused_simulation_clock_does_not_block_cancellation(bridge):
+    node, events, _ = bridge
+    node.commands.put(request("paused-clock", 3))
+    wait_for(lambda: state(events, "paused-clock", "accepted"))
+    changed = node.set_parameters([Parameter("use_sim_time", value=True)])
+    assert changed[0].successful
+    assert node.get_clock().now().nanoseconds == 0
+    node.commands.put(
+        {
+            "version": 1,
+            "type": "cancel",
+            "request_id": "clock-cancel",
+            "robot_id": "agv1",
+            "target_request_id": "paused-clock",
+        }
+    )
+    wait_for(lambda: state(events, "paused-clock", "cancelled"))
+    assert not node.gateway.active

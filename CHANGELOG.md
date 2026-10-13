@@ -7,7 +7,7 @@
 - Goal-timeout and uncertain-outcome holds that prevent blind resubmission.
 - Localization/battery subscriptions and stale-data dispatch checks.
 - Dedicated browser ROS control page with per-robot assignment tracking.
-- 55 browser/simulation tests and 18 ROS lifecycle/integration checks.
+- 55 browser/simulation tests and 19 ROS lifecycle/integration checks.
 - Docker/CI verification using real ROS action servers, plus a labelled browser fixture.
 
 

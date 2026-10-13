@@ -46,6 +46,10 @@ run `npm ci` and `npm run dev`, open **ROS 2**, and connect to the bridge.
 
 Copy `ros2/nodeai_bridge/config/robots.json` to a site configuration and pass it
 with `ros2 launch nodeai_bridge bridge.launch.py config_path:=/absolute/path/robots.json`.
+Use `use_sim_time:=true` when Nav2 uses a simulator clock. Goal timestamps then
+use ROS simulation time, while transport/cancellation deadlines and heartbeats
+use a steady clock so pausing simulation does not freeze those controls.
+
 Set each robot's namespace-specific action, localization topic, battery topic and
 frame ID. The example uses `/agv1/navigate_to_pose` and `/agv2/navigate_to_pose`,
 with corresponding AMCL/battery topics. It does not launch Nav2 or configure a
@@ -132,7 +136,7 @@ docker run --rm nodeai-ros-test
 ```
 
 The official ROS Jazzy image builds the package with `colcon`. The suite contains
-15 pure lifecycle tests and three integration tests using real rclpy action
+15 pure lifecycle tests and four integration tests using real rclpy action
 clients/servers, Nav2 messages and the WebSocket transport. It checks frame/goal
 construction, telemetry, feedback, success, rejection, cancellation and denied
 browser origins. These tests use a fixture action server; they are not a full

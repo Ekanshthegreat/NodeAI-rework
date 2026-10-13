@@ -11,6 +11,8 @@ import time
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from rclpy.clock import Clock
+from rclpy.clock_type import ClockType
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav2_msgs.action import NavigateToPose
@@ -139,8 +141,9 @@ class BridgeNode(Node):
                     raise ValueError(f"Robot needs {field}")
             self.ports[robot["id"]] = NavigationPort(self, robot)
         self.gateway = Gateway(self.ports, self.emit, time.monotonic)
-        self.create_timer(0.02, self.process_commands)
-        self.create_timer(0.5, self.heartbeat)
+        self.transport_clock = Clock(clock_type=ClockType.STEADY_TIME)
+        self.create_timer(0.02, self.process_commands, clock=self.transport_clock)
+        self.create_timer(0.5, self.heartbeat, clock=self.transport_clock)
 
     def publish_event(self, event):
         try:

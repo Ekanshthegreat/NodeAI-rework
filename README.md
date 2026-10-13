@@ -103,7 +103,7 @@ npm run build
 The browser/simulation release has 55 automated tests covering coordinate transforms, command and
 route validation, mission execution, recovery budgets, cargo handoff, persistence
 and replay lookup. CI installs from the lockfile and runs these checks, plus a separate Jazzy
-container job with 18 ROS lifecycle/integration tests. The MVP
+container job with 19 ROS lifecycle/integration tests. The MVP
 was also exercised in the browser on desktop and at a 390-pixel mobile width.
 
 ## Simulation boundaries
