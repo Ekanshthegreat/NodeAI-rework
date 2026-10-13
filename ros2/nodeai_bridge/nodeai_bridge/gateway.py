@@ -14,7 +14,7 @@ def identifier(value):
 
 
 def command(data):
-    if not isinstance(data, dict) or data.get("version") != 1:
+    if not isinstance(data, dict) or (type(data.get("version")) is not int or data.get("version") != 1):
         raise ValueError("Expected protocol version 1")
     kind = data.get("type")
     fields = {"version", "type", "request_id", "robot_id"}

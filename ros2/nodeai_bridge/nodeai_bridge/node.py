@@ -15,6 +15,7 @@ from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav2_msgs.action import NavigateToPose
 from sensor_msgs.msg import BatteryState
 from websockets.legacy.server import serve
+from websockets.exceptions import ConnectionClosed
 
 from nodeai_bridge.gateway import Gateway, identifier
 
@@ -147,6 +148,8 @@ async def socket_server(node):
                 except (ValueError, Full):
                     await socket.send(json.dumps({'version': 1, 'type': 'error', 'request_id': None,
                                                   'message': 'Invalid JSON or command queue full'}))
+        except ConnectionClosed:
+            pass
         finally:
             clients.discard(socket)
     async def broadcast():
