@@ -1,37 +1,13 @@
-import React from 'react';
+import { useEffect,type ReactNode } from 'react';
 import Header from './Header';
-import Sidebar from './Sidebar';
-import EventLog from './EventLog';
-import { useAppStore } from '../../store/useAppStore';
-
-interface LayoutProps {
-  children: React.ReactNode;
+import { useFleetStore } from '../../store/useFleetStore';
+export default function Layout({children}:{children:ReactNode}){
+  const initialize=useFleetStore(s=>s.initialize),tick=useFleetStore(s=>s.tick),save=useFleetStore(s=>s.save);
+  const warning=useFleetStore(s=>s.storageWarning);
+  useEffect(()=>{
+    initialize();const timer=window.setInterval(tick,100);
+    const onHide=()=>save();window.addEventListener('pagehide',onHide);
+    return()=>{window.clearInterval(timer);window.removeEventListener('pagehide',onHide);save();};
+  },[initialize,tick,save]);
+  return <div className="app-shell"><Header/>{warning&&<div role="status" className="storage-notice">{warning}</div>}<main className="workspace">{children}</main></div>;
 }
-
-const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const sidebarOpen = useAppStore((state) => state.sidebarOpen);
-
-  return (
-    <div className="h-screen flex flex-col bg-white">
-      <Header />
-      
-      <div className="flex-1 flex overflow-hidden">
-        <div className={`transition-all duration-300 ease-in-out ${sidebarOpen ? 'w-96' : 'w-0'}`}>
-          <Sidebar />
-        </div>
-        
-        <div className="flex-1 flex flex-col p-8 space-y-8">
-          <main className="flex-1">
-            {children}
-          </main>
-          
-          <div className="h-64">
-            <EventLog />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Layout;

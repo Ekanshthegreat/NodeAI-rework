@@ -1,81 +1,16 @@
-import { useEffect } from 'react';
-import type { Session, AuthChangeEvent } from '@supabase/supabase-js';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter,Routes,Route,Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { useAppStore } from './store/useAppStore';
-import { supabase } from './lib/supabase';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ReplayPage from './pages/ReplayPage';
 import Layout from './components/Layout/Layout';
 
-function App() {
-  const { isAuthenticated, setUser } = useAppStore();
-
-  useEffect(() => {
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
-      setUser(session?.user ?? null);
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [setUser]);
-
-  return (
-    <Router>
-      <div className="min-h-screen bg-slate-950 text-white">
-        <Routes>
-          <Route 
-            path="/login" 
-            element={isAuthenticated ? <Navigate to="/app" replace /> : <LoginPage />} 
-          />
-          <Route
-            path="/app"
-            element={
-              isAuthenticated ? (
-                <Layout>
-                  <DashboardPage />
-                </Layout>
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
-          <Route
-            path="/app/replay"
-            element={
-              isAuthenticated ? (
-                <Layout>
-                  <ReplayPage />
-                </Layout>
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
-          <Route path="/" element={<Navigate to="/app" replace />} />
-        </Routes>
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: '#1f2937',
-              color: '#f9fafb',
-              border: '1px solid #374151',
-            },
-          }}
-        />
-      </div>
-    </Router>
-  );
+export default function App(){
+  return <BrowserRouter><Routes>
+    <Route path="/" element={<LoginPage/>}/>
+    <Route path="/login" element={<Navigate to="/" replace/>}/>
+    <Route path="/app" element={<Layout><DashboardPage/></Layout>}/>
+    <Route path="/app/replay" element={<Layout><ReplayPage/></Layout>}/>
+    <Route path="*" element={<Navigate to="/" replace/>}/>
+  </Routes><Toaster position="bottom-right" toastOptions={{style:{background:'#172033',color:'#fff'},duration:4000}}/></BrowserRouter>;
 }
-
-export default App;
