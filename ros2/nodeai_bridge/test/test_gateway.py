@@ -168,6 +168,19 @@ class GatewayTests(unittest.TestCase):
         self.gateway.receive({**self.request, "extra": 1})
         self.assertEqual(len(self.port.sent), 0)
 
+    def test_robot_assignments_are_independent(self):
+        second = Port()
+        self.gateway.ports["agv2"] = second
+        first = self.send()
+        self.gateway.receive(
+            {**self.request, "robot_id": "agv2", "request_id": "second"}
+        )
+        self.assertEqual(len(self.gateway.active), 2)
+        handle = Handle()
+        first.set_result(handle)
+        self.complete(handle)
+        self.assertEqual(self.gateway.active, {"agv2": "second"})
+
     def test_protocol_version_boolean_is_rejected(self):
         with self.assertRaises(ValueError):
             command({**self.request, "version": True})

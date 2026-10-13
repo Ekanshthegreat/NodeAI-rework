@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 — 2026-10-13
+
+- ROS 2 Jazzy bridge package, launch file and per-robot topic/action configuration.
+- Real Nav2 goals, feedback, results and cancellation with bounded request history.
+- Goal-timeout and uncertain-outcome holds that prevent blind resubmission.
+- Localization/battery subscriptions and stale-data dispatch checks.
+- Dedicated browser ROS control page with per-robot assignment tracking.
+- 55 browser/simulation tests and 18 ROS lifecycle/integration checks.
+- Docker/CI verification using real ROS action servers, plus a labelled browser fixture.
+
+
 ## 0.1.0 — 2026-10-12
 
 - Accountless local fleet simulation with validated commands and safe static-map routing.

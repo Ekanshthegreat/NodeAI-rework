@@ -2,9 +2,10 @@
 
 [![Validate MVP](https://github.com/Ekanshthegreat/NodeAI-rework/actions/workflows/ci.yml/badge.svg)](https://github.com/Ekanshthegreat/NodeAI-rework/actions/workflows/ci.yml)
 
-A local robot-fleet simulator for planning missions, executing routes and examining
-fault recovery. The v0.1.0 MVP runs in a browser without an account, database or
-robot hardware.
+A ROS 2 navigation workspace with a browser control page and a separate local
+fleet simulator. Version 0.2.0 adds a Jazzy package for real Nav2 actions,
+localization and battery telemetry. The local simulator remains available without
+an account, database or robot hardware.
 
 ![Mission control](docs/images/mission-control.png)
 
@@ -22,7 +23,21 @@ file is required for the local demo. For a production build, run `npm run build`
 and `npm run preview`. Deploy `dist/` on a static host with all application paths
 rewritten to `index.html`; `/app` and `/app/replay` are client routes.
 
-## What works
+## ROS 2 / Nav2
+
+Open **ROS 2** in the application for the live bridge page. The repository now
+includes an `ament_python` package, launch/configuration files, Nav2 goal and
+cancellation handling, telemetry subscriptions and actual ROS action tests.
+See [ROS deployment and protocol](docs/ROS2.md) for setup and the container test
+fixture. The browser does not use simulated robot movement in this mode.
+
+ROS integration currently covers navigation goals. Robot-specific pickup,
+delivery, docking/charging handlers and restart reconciliation remain future
+work. The local simulator's compound tasks and automatic recovery are not sent
+to hardware. Real ROS interfaces were tested against a fixture action server,
+not a physical fleet or full Nav2/costmap deployment.
+
+## Local simulation capabilities
 
 - Constrained text commands compile into validated, typed mission plans.
 - Four-neighbour A* routes avoid static obstacles and a no-go polygon.
@@ -50,7 +65,7 @@ rewritten to `index.html`; `/app` and `/app/replay` are client routes.
 
 See [the demo guide](docs/DEMO.md) for additional scenarios and expected outcomes.
 
-## Commands
+## Local simulation commands
 
 Names are case-insensitive and must match an entry in
 [`src/lib/anchors.ts`](src/lib/anchors.ts). Six frequently used locations are
@@ -85,9 +100,10 @@ npm run test:run
 npm run build
 ```
 
-The release has 49 automated tests covering coordinate transforms, command and
+The browser/simulation release has 55 automated tests covering coordinate transforms, command and
 route validation, mission execution, recovery budgets, cargo handoff, persistence
-and replay lookup. CI installs from the lockfile and runs these checks. The MVP
+and replay lookup. CI installs from the lockfile and runs these checks, plus a separate Jazzy
+container job with 18 ROS lifecycle/integration tests. The MVP
 was also exercised in the browser on desktop and at a 390-pixel mobile width.
 
 ## Simulation boundaries
@@ -114,8 +130,7 @@ browser; storage failures are shown, and unreadable saved data is not overwritte
 until an explicit reset. Exported JSON has format version 1; importing runs is
 outside this release.
 
-Optional ROS, RMF, VDA5050 and Supabase modules are retained from the earlier
-prototype under `src/adapters/` and `src/lib/`. They are not used by the default
-local execution path and have not been validated against hardware or live vendor
+The older generic adapter UI, RMF, VDA5050 and Supabase modules are retained from the earlier
+prototype under `src/adapters/` and `src/lib/`. They are not used by the local execution path or the new ROS control page and have not been validated against hardware or live vendor
 services. Environment examples are only for those integrations. This is a
 software simulation MVP, not a production robot controller.

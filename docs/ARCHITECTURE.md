@@ -1,5 +1,10 @@
 # Architecture
 
+The local simulator described below is separate from the ROS 2 runtime. See
+[ROS 2 architecture](ROS2.md) for topic/action ports and the real navigation
+lifecycle. ROS mode delegates route planning to Nav2 rather than local A*.
+
+
 ## A mission from input to replay
 
 ```mermaid
