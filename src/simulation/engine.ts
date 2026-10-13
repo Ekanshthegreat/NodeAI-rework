@@ -13,7 +13,7 @@ export interface Execution extends Omit<Mission,'status'> {
 }
 export interface SimEvent { sequence:number;at:number;type:string;message:string;missionId:string|null;robotId:string|null }
 export interface Frame { at:number;status:MissionStatus;step:number;robotId:string;robots:Robot[] }
-export interface Recording { missionId:string;frames:Frame[] }
+export interface Recording { missionId:string;frames:Frame[];events:SimEvent[] }
 export interface FleetState {
   version:1;baseTime:number;elapsedMs:number;nextMission:number;nextEvent:number;
   site:Site;robots:Robot[];missions:Execution[];events:SimEvent[];recordings:Record<string,Recording>;
@@ -35,6 +35,7 @@ export function createDemoState(baseTime=Date.now()):FleetState {
 }
 function emit(s:FleetState,type:string,message:string,m:Execution|null=null,robotId:string|null=null):void {
   s.events.push({sequence:s.nextEvent++,at:s.elapsedMs,type,message,missionId:m?.id??null,robotId:robotId??m?.robotId??null});
+  if(m && s.recordings[m.id])s.recordings[m.id].events.push(s.events[s.events.length-1]);
   s.events=s.events.slice(-1000);
 }
 function capture(s:FleetState,m:Execution,force=false):void {
@@ -80,7 +81,7 @@ export function submitMission(state:FleetState,text:string):FleetState {
   s.missions=s.missions.slice(-50);
   const keys=Object.keys(s.recordings);
   if(keys.length>=MAX_RECORDINGS){const old=keys.find(k=>!s.missions.some(x=>x.id===k&&!terminal(x)));if(old)delete s.recordings[old];}
-  s.recordings[id]={missionId:id,frames:[]};
+  s.recordings[id]={missionId:id,frames:[],events:[]};
   startStep(s,m,robot);emit(s,'mission_started',`${id} assigned to ${robot.id}`,m);capture(s,m,true);return s;
 }
 export function setMissionPaused(state:FleetState,id:string,paused:boolean):FleetState {
