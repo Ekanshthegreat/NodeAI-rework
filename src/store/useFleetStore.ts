@@ -28,7 +28,7 @@ function load(): { fleet: FleetState; storageWarning: string | null } {
 }
 function synchronize(fleet: FleetState): void {
   const completed = fleet.missions.filter((m) => m.status === 'completed').length;
-  const recoveries = fleet.events.filter((e) => e.type === 'mission_reassigned').length;
+  const recoveries = fleet.missions.reduce((count, m) => count + m.retries, 0);
   useAppStore.setState({
     sites: [fleet.site],
     robots: fleet.robots,

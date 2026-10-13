@@ -90,7 +90,11 @@ export default function FleetMap({
             cx={x(r.pose.x)}
             cy={y(r.pose.y)}
             r={selectedRobot === r.id ? 11 : 9}
-            fill={r.status === 'BLOCKED' || r.status === 'CHARGING' ? '#8a5e42' : '#245b91'}
+            fill={
+              r.status === 'BLOCKED' || r.status === 'ERROR' || r.status === 'CHARGING'
+                ? '#8a5e42'
+                : '#245b91'
+            }
             stroke="white"
             strokeWidth="3"
           />

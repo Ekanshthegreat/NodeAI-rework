@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isSegmentClear } from '../lib/planner_path';
 import { MissionPlan } from '../lib/schemas';
 import { MAX_FRAMES, MAX_RECORDINGS, type FleetState } from './engine';
 const number = z.number().finite();
@@ -112,5 +113,44 @@ export function decodeSnapshot(text: string): FleetState {
     .map((m) => m.robotId);
   if (new Set(occupied).size !== occupied.length)
     throw new Error('Conflicting saved robot assignments');
+  const missionIds = new Set(s.missions.map((m) => m.id));
+  const largestMission = Math.max(0, ...s.missions.map((m) => Number(m.id.replace(/^M/, ''))));
+  if (
+    !Number.isFinite(largestMission) ||
+    s.nextMission <= largestMission ||
+    s.nextEvent <= Math.max(0, ...s.events.map((e) => e.sequence))
+  )
+    throw new Error('Saved counters would reuse identifiers');
+  if (Object.keys(s.faults).some((id) => !ids.has(id))) throw new Error('Unknown faulted robot');
+  for (const [id, recording] of Object.entries(s.recordings)) {
+    if (
+      !missionIds.has(id) ||
+      recording.missionId !== id ||
+      recording.frames.some(
+        (f, i) => !ids.has(f.robotId) || (i > 0 && f.at < recording.frames[i - 1].at)
+      )
+    )
+      throw new Error('Invalid recording references or timestamps');
+  }
+  for (const m of s.missions) {
+    if (
+      m.plan.mission_id !== m.id ||
+      m.plan.site_id !== s.site.id ||
+      m.site_id !== s.site.id ||
+      m.plan.robot_selection.include[0] !== m.robotId
+    )
+      throw new Error('Mission plan references do not match execution');
+    if ((m.status === 'active' || m.status === 'paused') && m.step >= m.plan.subtasks.length)
+      throw new Error('Active mission has no remaining step');
+    if (
+      m.route.some(
+        (p, i) =>
+          Math.abs(p.x) > 10 ||
+          Math.abs(p.y) > 10 ||
+          (i > 0 && !isSegmentClear(m.route[i - 1], p, s.site.obstacles, s.site.noGo))
+      )
+    )
+      throw new Error('Saved route crosses an obstacle or map boundary');
+  }
   return s;
 }

@@ -114,3 +114,38 @@ describe('bounded fault recovery', () => {
     expect(advance(s, 150)).toEqual(advance(s, 150));
   });
 });
+
+describe('battery service and bounded retention', () => {
+  it('records natural depletion and allows a depleted robot to be serviced', () => {
+    let s = submitMission(createDemoState(0), 'Go to Pharmacy');
+    s.robots[0].battery = 0.20001;
+    s = tickFleet(tickFleet(s));
+    expect(s.missions[0].robotId).not.toBe('AGV-001');
+    expect(s.faults['AGV-001']).toBe('LOW_BATTERY');
+    expect(s.robots[0].status).toBe('ERROR');
+    s = clearFault(s, 'AGV-001');
+    expect(s.robots[0].status).toBe('IDLE');
+    expect(s.robots[0].battery).toBe(0.8);
+  });
+  it('charges at a named station and only completes after reaching the battery target', () => {
+    const initial = createDemoState(0);
+    initial.robots.forEach((r, i) => {
+      r.battery = 0.5 - i * 0.1;
+    });
+    const s = advance(submitMission(initial, 'Charge'), 400);
+    expect(s.missions[0].status).toBe('completed');
+    expect(s.robots[0].battery).toBe(0.95);
+    expect(s.robots[0].pose.x).toBe(-5);
+    expect(s.robots[0].pose.y).toBe(-3);
+  });
+  it('retains only ten recordings and does not evict an active run', () => {
+    let s = submitMission(createDemoState(0), 'Go to Pharmacy');
+    s = setMissionPaused(s, 'M001', true);
+    for (let i = 0; i < 15; i++) {
+      s = submitMission(s, 'Inspect Ward B');
+      s = cancelMission(s, s.missions[s.missions.length - 1].id);
+    }
+    expect(Object.keys(s.recordings)).toHaveLength(10);
+    expect(s.recordings.M001).toBeDefined();
+  });
+});

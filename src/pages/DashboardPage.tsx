@@ -53,7 +53,7 @@ export default function DashboardPage() {
           </strong>
         </div>
         <div>
-          <span>Active missions</span>
+          <span>Open missions</span>
           <strong>{active.length}</strong>
         </div>
         <div>
@@ -62,7 +62,7 @@ export default function DashboardPage() {
         </div>
         <div>
           <span>Reassignments</span>
-          <strong>{fleet.events.filter((e) => e.type === 'mission_reassigned').length}</strong>
+          <strong>{fleet.missions.reduce((count, m) => count + m.retries, 0)}</strong>
         </div>
         <div>
           <span>Simulation time</span>
@@ -155,6 +155,10 @@ export default function DashboardPage() {
       <div className="lower-grid">
         <section className="panel">
           <h2>Robots</h2>
+          <p className="field-help">
+            Clear fault simulates an operator returning the robot to service; low-battery recovery
+            includes a replacement battery.
+          </p>
           <div className="robot-list">
             {fleet.robots.map((r) => (
               <article className="robot-card" key={r.id}>
@@ -181,7 +185,7 @@ export default function DashboardPage() {
                   >
                     Low battery
                   </button>
-                  {fleet.faults[r.id] && (
+                  {(fleet.faults[r.id] || r.status === 'ERROR' || r.battery < 0.2) && (
                     <button className="quiet-button" onClick={() => store.clearFault(r.id)}>
                       Clear fault
                     </button>

@@ -9,7 +9,10 @@ export default function RobotMesh({
   position: [number, number, number];
   rotation: [number, number, number];
 }) {
-  const color = robot.status === 'BLOCKED' || robot.status === 'CHARGING' ? '#8a5e42' : '#245b91';
+  const color =
+    robot.status === 'BLOCKED' || robot.status === 'ERROR' || robot.status === 'CHARGING'
+      ? '#8a5e42'
+      : '#245b91';
   return (
     <group position={position} rotation={rotation}>
       <mesh castShadow>

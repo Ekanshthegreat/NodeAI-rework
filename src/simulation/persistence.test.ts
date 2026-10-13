@@ -29,3 +29,30 @@ describe('saved fleet validation', () => {
     expect(() => decodeSnapshot(JSON.stringify(s))).toThrow('Conflicting');
   });
 });
+
+it('rejects reused counters and mismatched plan IDs', () => {
+  const s = submitMission(createDemoState(0), 'Go to Pharmacy');
+  s.nextMission = 1;
+  expect(() => decodeSnapshot(JSON.stringify(s))).toThrow('counters');
+  s.nextMission = 2;
+  s.missions[0].plan.mission_id = 'other';
+  expect(() => decodeSnapshot(JSON.stringify(s))).toThrow('references');
+});
+it('rejects persisted routes that cross map obstacles', () => {
+  const s = submitMission(createDemoState(0), 'Go to Pharmacy');
+  s.missions[0].route = [
+    { x: 0, y: 0, theta: 0 },
+    { x: 0, y: 5, theta: 0 },
+  ];
+  s.missions[0].waypoint = 1;
+  expect(() => decodeSnapshot(JSON.stringify(s))).toThrow('obstacle');
+});
+it('rejects non-monotonic replay timestamps', () => {
+  const s = submitMission(createDemoState(0), 'Go to Pharmacy');
+  const frame = s.recordings.M001.frames[0];
+  s.recordings.M001.frames = [
+    { ...frame, at: 500 },
+    { ...frame, at: 100 },
+  ];
+  expect(() => decodeSnapshot(JSON.stringify(s))).toThrow('timestamps');
+});

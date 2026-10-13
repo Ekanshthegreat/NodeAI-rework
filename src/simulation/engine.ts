@@ -270,7 +270,7 @@ export function injectFault(state: FleetState, robotId: string, fault: Fault): F
     robot = s.robots.find((r) => r.id === robotId);
   if (!robot) throw new Error('Unknown robot');
   s.faults[robotId] = fault;
-  robot.status = fault === 'BLOCKED' ? 'BLOCKED' : 'CHARGING';
+  robot.status = fault === 'BLOCKED' ? 'BLOCKED' : 'ERROR';
   if (fault === 'LOW_BATTERY') robot.battery = 0.05;
   const mission = s.missions.find((m) => m.robotId === robotId && !terminal(m));
   if (mission) mission.blockedSince = s.elapsedMs;
@@ -284,7 +284,7 @@ export function clearFault(state: FleetState, robotId: string): FleetState {
   if (!robot) return s;
   const fault = s.faults[robotId];
   delete s.faults[robotId];
-  if (fault === 'LOW_BATTERY') robot.battery = 0.8;
+  if (fault === 'LOW_BATTERY' || robot.battery < 0.2) robot.battery = 0.8;
   robot.status = s.missions.some((m) => m.robotId === robotId && !terminal(m)) ? 'ACTIVE' : 'IDLE';
   for (const m of s.missions.filter((m) => m.robotId === robotId)) m.blockedSince = null;
   emit(s, 'fault_cleared', `Fault cleared on ${robotId}`, null, robotId);
@@ -319,7 +319,7 @@ function recover(s: FleetState, m: Execution, old: Robot): void {
     m.retries++;
     m.blockedSince = null;
     robot.status = 'ACTIVE';
-    if (!s.faults[old.id]) old.status = 'CHARGING';
+    if (!s.faults[old.id]) old.status = 'ERROR';
     emit(
       s,
       'mission_reassigned',
@@ -373,6 +373,11 @@ export function tickFleet(state: FleetState): FleetState {
       s.faults[robot.id] ??
       (robot.battery < m.plan.constraints.min_battery_pct ? 'LOW_BATTERY' : undefined);
     if (fault) {
+      if (!s.faults[robot.id]) {
+        s.faults[robot.id] = fault;
+        robot.status = 'ERROR';
+        emit(s, 'low_battery_detected', `Low battery detected on ${robot.id}`, m);
+      }
       m.blockedSince ??= s.elapsedMs;
       const threshold = (m.plan.subtasks[m.step]?.policy.reassign_on_blocked_s ?? 3) * 1000;
       if (s.selfHealing && (fault === 'LOW_BATTERY' || s.elapsedMs - m.blockedSince >= threshold))
@@ -395,7 +400,10 @@ export function tickFleet(state: FleetState): FleetState {
         }
       } else {
         const task = m.plan.subtasks[m.step];
-        if (task.verb === 'charge') robot.battery = Math.min(0.95, robot.battery + 0.005);
+        if (task.verb === 'charge') {
+          robot.status = 'CHARGING';
+          robot.battery = Math.min(0.95, robot.battery + 0.005);
+        }
         const duration = task.verb === 'navigate' ? 100 : task.verb === 'inspect' ? 2000 : 1000;
         if (m.actionMs >= duration && (task.verb !== 'charge' || robot.battery >= 0.95)) {
           if (task.verb === 'pickup') m.hasCargo = true;
