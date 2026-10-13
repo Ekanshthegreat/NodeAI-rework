@@ -24,7 +24,7 @@ export interface Mission {
   id: string;
   site_id: string;
   nl: string;
-  status: 'planning' | 'active' | 'completed' | 'failed';
+  status: 'planning' | 'active' | 'paused' | 'completed' | 'failed' | 'cancelled';
   created_at: string;
 }
 
