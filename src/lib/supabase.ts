@@ -14,13 +14,16 @@ export const supabase = isUsingMockClient
   : createClient(supabaseUrl, supabaseAnonKey);
 
 function createMockClient() {
-  console.warn('Using mock Supabase client - set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for real backend');
-  
+  console.warn(
+    'Using mock Supabase client - set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for real backend'
+  );
+
   return {
     auth: {
       getSession: () => Promise.resolve({ data: { session: null }, error: null }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-      signInWithPassword: () => Promise.resolve({ data: { user: null }, error: { message: 'Mock client' } }),
+      signInWithPassword: () =>
+        Promise.resolve({ data: { user: null }, error: { message: 'Mock client' } }),
       signUp: () => Promise.resolve({ data: { user: null }, error: { message: 'Mock client' } }),
       signOut: () => Promise.resolve({ error: null }),
     },
@@ -38,7 +41,7 @@ function createMockClient() {
         getPublicUrl: () => ({ data: { publicUrl: null } }),
       }),
     },
-  } as any;
+  } as unknown as ReturnType<typeof createClient>;
 }
 
 // Database operations
@@ -56,7 +59,14 @@ export async function loadSites(): Promise<Site[]> {
           { id: 'obs2', rect: { x: -2, y: 4, w: 1.5, h: 2 } },
         ],
         noGo: [
-          { id: 'nogo1', poly: [{ x: 1, y: -3 }, { x: 3, y: -3 }, { x: 2, y: -1 }] },
+          {
+            id: 'nogo1',
+            poly: [
+              { x: 1, y: -3 },
+              { x: 3, y: -3 },
+              { x: 2, y: -1 },
+            ],
+          },
         ],
       },
     ];
@@ -146,13 +156,11 @@ export async function saveMissionPlan(missionId: string, plan: MissionPlan): Pro
     return;
   }
 
-  const { error } = await supabase
-    .from('mission_plans')
-    .upsert({
-      mission_id: missionId,
-      plan_json: plan,
-      validated: true,
-    });
+  const { error } = await supabase.from('mission_plans').upsert({
+    mission_id: missionId,
+    plan_json: plan,
+    validated: true,
+  });
 
   if (error) throw error;
 }
@@ -166,11 +174,7 @@ export async function upsertSite(site: Omit<Site, 'obstacles' | 'noGo'>): Promis
     };
   }
 
-  const { data, error } = await supabase
-    .from('sites')
-    .upsert(site)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('sites').upsert(site).select().single();
 
   if (error) throw error;
   return data;
@@ -182,19 +186,17 @@ export async function uploadMapImage(file: File, siteId: string): Promise<string
   }
 
   const fileName = `${siteId}-${Date.now()}.${file.name.split('.').pop()}`;
-  
-  const { error } = await supabase.storage
-    .from(storageBucket)
-    .upload(fileName, file, {
-      cacheControl: '3600',
-      upsert: true,
-    });
+
+  const { error } = await supabase.storage.from(storageBucket).upload(fileName, file, {
+    cacheControl: '3600',
+    upsert: true,
+  });
 
   if (error) throw error;
 
-  const { data: { publicUrl } } = supabase.storage
-    .from(storageBucket)
-    .getPublicUrl(fileName);
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(storageBucket).getPublicUrl(fileName);
 
   return publicUrl;
 }
@@ -212,9 +214,7 @@ export async function getSignedMapUrl(path: string): Promise<string | null> {
     }
 
     // Create signed URL for Supabase storage path
-    const { data, error } = await supabase.storage
-      .from(storageBucket)
-      .createSignedUrl(path, 3600); // 1 hour expiry
+    const { data, error } = await supabase.storage.from(storageBucket).createSignedUrl(path, 3600); // 1 hour expiry
 
     if (error) {
       console.warn('Failed to create signed URL:', error);

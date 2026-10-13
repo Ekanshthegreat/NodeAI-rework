@@ -18,14 +18,14 @@ const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({ isOpen, onClose }) 
   const [saving, setSaving] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  
+
   // Calibration state
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [calibrationPoints, setCalibrationPoints] = useState<Array<[number, number]>>([]);
   const [calibrationDistance, setCalibrationDistance] = useState<number | null>(null);
   const [origin, setOrigin] = useState<[number, number] | null>(null);
 
-  const currentSiteData = sites.find(site => site.id === currentSite);
+  const currentSiteData = sites.find((site) => site.id === currentSite);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -45,11 +45,11 @@ const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({ isOpen, onClose }) 
     }
 
     setSelectedFile(file);
-    
+
     // Create preview URL
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
-    
+
     // Reset calibration state
     setCalibrationPoints([]);
     setCalibrationDistance(null);
@@ -64,24 +64,22 @@ const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({ isOpen, onClose }) 
     try {
       const mapUrl = await uploadMapImage(selectedFile, currentSite);
       toast.success('Map uploaded successfully!');
-      
+
       // Update site with new map URL
       if (currentSiteData) {
         const updatedSite = await upsertSite({
           ...currentSiteData,
           map_url: mapUrl,
         });
-        
-        setSites(sites.map(site => 
-          site.id === currentSite ? updatedSite : site
-        ));
+
+        setSites(sites.map((site) => (site.id === currentSite ? updatedSite : site)));
       }
-      
+
       setSelectedFile(null);
       setPreviewUrl(null);
     } catch (error) {
       console.error('Upload error:', error);
-      
+
       if (error instanceof Error) {
         if (error.message.includes('mime type') && error.message.includes('not supported')) {
           toast.error('File format not supported. Please use PNG, JPEG, WebP, or GIF.');
@@ -132,17 +130,15 @@ const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({ isOpen, onClose }) 
     setSaving(true);
     try {
       const scale = calculateScale(calibrationPoints[0], calibrationPoints[1], calibrationDistance);
-      
+
       const updatedSite = await upsertSite({
         ...currentSiteData,
         scale_m_per_px: scale,
         origin: origin ? { x: origin[0], y: origin[1] } : currentSiteData.origin,
       });
-      
-      setSites(sites.map(site => 
-        site.id === currentSite ? updatedSite : site
-      ));
-      
+
+      setSites(sites.map((site) => (site.id === currentSite ? updatedSite : site)));
+
       toast.success('Map calibration saved successfully!');
       resetCalibration();
     } catch (error) {
@@ -156,7 +152,7 @@ const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({ isOpen, onClose }) 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-      
+
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <Dialog.Panel className="bg-slate-800 rounded-lg border border-slate-700 p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
@@ -170,7 +166,7 @@ const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({ isOpen, onClose }) 
               <X className="w-5 h-5 text-slate-400" />
             </button>
           </div>
-          
+
           <div className="space-y-6">
             {/* File Upload Section */}
             <div>
@@ -187,7 +183,7 @@ const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({ isOpen, onClose }) 
                     Supported formats: PNG, JPEG, WebP, GIF (max 10MB)
                   </p>
                 </div>
-                
+
                 {selectedFile && (
                   <div className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
                     <span className="text-sm text-slate-300">{selectedFile.name}</span>
@@ -257,12 +253,12 @@ const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({ isOpen, onClose }) 
                         Calibration Points
                       </label>
                       <div className="text-sm text-slate-400">
-                        {calibrationPoints.length === 0 && "Click first point on the map"}
-                        {calibrationPoints.length === 1 && "Click second point on the map"}
-                        {calibrationPoints.length === 2 && "Both points selected"}
+                        {calibrationPoints.length === 0 && 'Click first point on the map'}
+                        {calibrationPoints.length === 1 && 'Click second point on the map'}
+                        {calibrationPoints.length === 2 && 'Both points selected'}
                       </div>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-2">
                         Real Distance (meters)
@@ -287,10 +283,12 @@ const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({ isOpen, onClose }) 
                   <h4 className="text-sm font-medium text-slate-300 mb-2">Current Settings</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm text-slate-400">
                     <div>
-                      <span className="font-medium">Scale:</span> {currentSiteData.scale_m_per_px.toFixed(4)} m/px
+                      <span className="font-medium">Scale:</span>{' '}
+                      {currentSiteData.scale_m_per_px.toFixed(4)} m/px
                     </div>
                     <div>
-                      <span className="font-medium">Origin:</span> ({currentSiteData.origin.x}, {currentSiteData.origin.y})
+                      <span className="font-medium">Origin:</span> ({currentSiteData.origin.x},{' '}
+                      {currentSiteData.origin.y})
                     </div>
                   </div>
                 </div>

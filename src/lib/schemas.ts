@@ -58,6 +58,6 @@ export const EventMessage = z.object({
   robot_id: z.string().optional(),
   level: z.enum(['INFO', 'WARN', 'ERROR']),
   msg: z.string(),
-  payload: z.record(z.any()).optional(),
+  payload: z.record(z.unknown()).optional(),
 });
 export type EventMessage = z.infer<typeof EventMessage>;

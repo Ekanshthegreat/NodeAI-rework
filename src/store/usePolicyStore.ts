@@ -7,17 +7,17 @@ interface PolicyStore {
   selfHealingEnabled: boolean;
   missionPlans: Map<string, MissionPlan>;
   replanHistory: Map<string, number>; // mission_id -> replan count
-  
+
   // Fault injection state
   injectedFaults: Map<string, { type: 'BLOCKED' | 'LOW_BATTERY'; until: number }>;
-  
+
   // Actions
   setSelfHealingEnabled: (enabled: boolean) => void;
   setMissionPlan: (missionId: string, plan: MissionPlan) => void;
   getMissionPlan: (missionId: string) => MissionPlan | null;
   incrementReplanCount: (missionId: string) => void;
   getReplanCount: (missionId: string) => number;
-  
+
   // Fault injection
   injectFault: (robotId: string, type: 'BLOCKED' | 'LOW_BATTERY', durationMs: number) => void;
   clearFault: (robotId: string) => void;
@@ -104,13 +104,13 @@ export const usePolicyStore = create<PolicyStore>()(
           (state) => {
             const now = Date.now();
             const newFaults = new Map();
-            
+
             for (const [robotId, fault] of state.injectedFaults) {
               if (fault.until > now) {
                 newFaults.set(robotId, fault);
               }
             }
-            
+
             return { injectedFaults: newFaults };
           },
           false,

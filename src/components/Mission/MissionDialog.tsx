@@ -20,7 +20,7 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
   const [naturalLanguage, setNaturalLanguage] = useState('');
   const [priority, setPriority] = useState<'low' | 'normal' | 'high'>('normal');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const { currentSite, missions, setMissions, robots, addEvent } = useAppStore();
   const { setMissionPath } = useSceneStore();
   const { setMissionPlan } = usePolicyStore();
@@ -30,17 +30,17 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
     if (!naturalLanguage.trim() || !currentSite) return;
 
     setIsSubmitting(true);
-    
+
     try {
       const missionId = generateMissionId();
-      
+
       // Compile NL to mission plan
-      const siteRobots = robots.filter(r => r.site_id === currentSite);
+      const siteRobots = robots.filter((r) => r.site_id === currentSite);
       const plan = compileNLToPlan(naturalLanguage.trim(), currentSite, siteRobots, {
         defaultMinBattery: 0.2,
         defaultPolicy: { reassign_on_blocked_s: 10, retry_limit: 1 },
       });
-      
+
       // Save to database
       const { error: missionError } = await supabase
         .from('missions')
@@ -52,17 +52,17 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
         })
         .select()
         .single();
-      
+
       if (missionError) throw missionError;
-      
+
       // Save mission plan
       await saveMissionPlan(missionId, plan);
-      
+
       // Store in policy store
       setMissionPlan(missionId, plan);
-      
+
       // Compile and store mission path
-      const assignedRobot = siteRobots.find(r => r.id === plan.robot_selection.include[0]);
+      const assignedRobot = siteRobots.find((r) => r.id === plan.robot_selection.include[0]);
       if (assignedRobot) {
         const missionPath = compileMissionPath(
           { id: missionId, nl: naturalLanguage.trim() },
@@ -71,7 +71,7 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
         );
         setMissionPath(missionId, missionPath);
       }
-      
+
       // Update local state
       const newMission = {
         id: missionId,
@@ -80,9 +80,9 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
         status: 'planning' as const,
         created_at: new Date().toISOString(),
       };
-      
+
       setMissions([...missions, newMission]);
-      
+
       // Add event
       addEvent({
         id: `event-${Date.now()}`,
@@ -92,9 +92,9 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
         payload: { action: 'created', priority },
         ts: new Date().toISOString(),
       });
-      
+
       toast.success('Mission created successfully!');
-      
+
       setNaturalLanguage('');
       onClose();
     } catch (error) {
@@ -108,13 +108,11 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-      
+
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <Dialog.Panel className="bg-gray-800 rounded-lg border border-gray-700 p-6 w-full max-w-md">
           <div className="flex items-center justify-between mb-4">
-            <Dialog.Title className="text-lg font-semibold text-white">
-              New Mission
-            </Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold text-white">New Mission</Dialog.Title>
             <button
               onClick={onClose}
               className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
@@ -122,7 +120,7 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
               <X className="w-5 h-5 text-gray-400" />
             </button>
           </div>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -138,9 +136,7 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Priority:
-              </label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Priority:</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as 'low' | 'normal' | 'high')}

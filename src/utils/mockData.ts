@@ -5,14 +5,16 @@ export const generateMockData = () => {
     {
       id: 'warehouse_alpha',
       name: 'Warehouse Alpha',
-      map_url: 'https://images.pexels.com/photos/1267338/pexels-photo-1267338.jpeg?auto=compress&cs=tinysrgb&w=1024&h=1024&fit=crop',
+      map_url:
+        'https://images.pexels.com/photos/1267338/pexels-photo-1267338.jpeg?auto=compress&cs=tinysrgb&w=1024&h=1024&fit=crop',
       origin: { x: 0, y: 0 },
       scale_m_per_px: 0.1,
     },
     {
       id: 'factory_beta',
       name: 'Factory Beta',
-      map_url: 'https://images.pexels.com/photos/236698/pexels-photo-236698.jpeg?auto=compress&cs=tinysrgb&w=1024&h=1024&fit=crop',
+      map_url:
+        'https://images.pexels.com/photos/236698/pexels-photo-236698.jpeg?auto=compress&cs=tinysrgb&w=1024&h=1024&fit=crop',
       origin: { x: 0, y: 0 },
       scale_m_per_px: 0.05,
     },

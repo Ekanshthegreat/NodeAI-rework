@@ -46,7 +46,7 @@ describe('Coordinate Transformations', () => {
       const point1: [number, number] = [0, 0];
       const point2: [number, number] = [100, 0]; // 100 pixels apart horizontally
       const realDistance = 10; // 10 meters in real world
-      
+
       const scale = calculateScale(point1, point2, realDistance);
       expect(scale).toBe(0.1); // 10m / 100px = 0.1 m/px
     });
@@ -55,7 +55,7 @@ describe('Coordinate Transformations', () => {
       const point1: [number, number] = [0, 0];
       const point2: [number, number] = [30, 40]; // 3-4-5 triangle, 50 pixels apart
       const realDistance = 5; // 5 meters in real world
-      
+
       const scale = calculateScale(point1, point2, realDistance);
       expect(scale).toBe(0.1); // 5m / 50px = 0.1 m/px
     });
@@ -64,7 +64,7 @@ describe('Coordinate Transformations', () => {
       const point1: [number, number] = [100, 100];
       const point2: [number, number] = [100, 100];
       const realDistance = 10;
-      
+
       expect(() => calculateScale(point1, point2, realDistance)).toThrow(
         'Calibration points cannot be the same'
       );
@@ -73,9 +73,12 @@ describe('Coordinate Transformations', () => {
 
   describe('validateCalibration', () => {
     it('should validate correct calibration data', () => {
-      const points: Array<[number, number]> = [[0, 0], [100, 0]];
+      const points: Array<[number, number]> = [
+        [0, 0],
+        [100, 0],
+      ];
       const distance = 10;
-      
+
       const result = validateCalibration(points, distance);
       expect(result.valid).toBe(true);
       expect(result.error).toBeUndefined();
@@ -84,25 +87,31 @@ describe('Coordinate Transformations', () => {
     it('should reject insufficient points', () => {
       const points: Array<[number, number]> = [[0, 0]];
       const distance = 10;
-      
+
       const result = validateCalibration(points, distance);
       expect(result.valid).toBe(false);
       expect(result.error).toBe('Need at least 2 calibration points');
     });
 
     it('should reject invalid distance', () => {
-      const points: Array<[number, number]> = [[0, 0], [100, 0]];
+      const points: Array<[number, number]> = [
+        [0, 0],
+        [100, 0],
+      ];
       const distance = 0;
-      
+
       const result = validateCalibration(points, distance);
       expect(result.valid).toBe(false);
       expect(result.error).toBe('Distance must be greater than 0');
     });
 
     it('should reject points too close together', () => {
-      const points: Array<[number, number]> = [[0, 0], [5, 0]]; // Only 5 pixels apart
+      const points: Array<[number, number]> = [
+        [0, 0],
+        [5, 0],
+      ]; // Only 5 pixels apart
       const distance = 10;
-      
+
       const result = validateCalibration(points, distance);
       expect(result.valid).toBe(false);
       expect(result.error).toBe('Calibration points too close together');
@@ -113,11 +122,11 @@ describe('Coordinate Transformations', () => {
 describe('Round-trip Conversions', () => {
   it('should maintain accuracy in round-trip conversions', () => {
     const originalWorld: [number, number] = [15.5, 23.7];
-    
+
     // World -> Pixel -> World
     const [px, py] = worldToPixel(originalWorld[0], originalWorld[1], mockSite);
     const [worldX, worldY] = pixelToWorld(px, py, mockSite);
-    
+
     expect(worldX).toBeCloseTo(originalWorld[0], 10);
     expect(worldY).toBeCloseTo(originalWorld[1], 10);
   });
@@ -125,10 +134,10 @@ describe('Round-trip Conversions', () => {
   it('should handle different scales correctly', () => {
     const highResSite = { ...mockSite, scale_m_per_px: 0.01 }; // 1cm per pixel
     const originalWorld: [number, number] = [5.25, 8.75];
-    
+
     const [px, py] = worldToPixel(originalWorld[0], originalWorld[1], highResSite);
     const [worldX, worldY] = pixelToWorld(px, py, highResSite);
-    
+
     expect(worldX).toBeCloseTo(originalWorld[0], 10);
     expect(worldY).toBeCloseTo(originalWorld[1], 10);
   });

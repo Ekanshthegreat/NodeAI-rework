@@ -15,7 +15,7 @@ class MockAdapter implements Adapter {
       ts: Date.now(),
       level: 'INFO',
       msg: '[MOCK] Adapter connected',
-      payload: {}
+      payload: {},
     });
   }
 
@@ -29,7 +29,7 @@ class MockAdapter implements Adapter {
       ts: Date.now(),
       level: 'INFO',
       msg: '[MOCK] Adapter disconnected',
-      payload: {}
+      payload: {},
     });
   }
 
@@ -46,12 +46,12 @@ class MockAdapter implements Adapter {
       ts: Date.now(),
       level: 'INFO',
       msg: `[MOCK] Mission sent: ${mission.natural_language}`,
-      payload: { mission_id: mission.mission_id }
+      payload: { mission_id: mission.mission_id },
     });
   }
 
   startSimulation(robotIds: string[]): void {
-    robotIds.forEach(robotId => {
+    robotIds.forEach((robotId) => {
       this.robots.set(robotId, {
         type: 'telemetry',
         ts: Date.now(),
@@ -61,7 +61,7 @@ class MockAdapter implements Adapter {
         vel: 0,
         battery: 0.8 + Math.random() * 0.2,
         status: 'IDLE',
-        task_id: null
+        task_id: null,
       });
     });
 
@@ -81,10 +81,10 @@ class MockAdapter implements Adapter {
           pose: {
             x: robot.pose.x + deltaX,
             y: robot.pose.y + deltaY,
-            theta: robot.pose.theta + deltaTheta
+            theta: robot.pose.theta + deltaTheta,
           },
           vel: Math.sqrt(deltaX * deltaX + deltaY * deltaY),
-          battery: Math.max(0, robot.battery - 0.001)
+          battery: Math.max(0, robot.battery - 0.001),
         };
 
         if (updatedRobot.battery < 0.2 && robot.status !== 'CHARGING') {

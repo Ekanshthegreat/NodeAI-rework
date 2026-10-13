@@ -5,7 +5,7 @@ import type { AdapterType } from '../adapters';
 
 interface AppState {
   // Authentication
-  user: any;
+  user: { id: string; email?: string } | null;
   isAuthenticated: boolean;
 
   // UI State
@@ -37,7 +37,7 @@ interface AppState {
   faultInjected: boolean;
 
   // Actions
-  setUser: (user: any) => void;
+  setUser: (user: { id: string; email?: string } | null) => void;
   setSidebarOpen: (open: boolean) => void;
   setCurrentSite: (site: string | null) => void;
   setSelectedRobot: (robot: string | null) => void;
@@ -75,7 +75,7 @@ export const useAppStore = create<AppState>()(
         mock: false,
         ros: false,
         rmf: false,
-        vda5050: false
+        vda5050: false,
       },
       sites: [],
       robots: [],
@@ -92,35 +92,35 @@ export const useAppStore = create<AppState>()(
         uptime: 0,
         replans_count: 0,
         interventions_avoided: 0,
-        mttr_ms_avg: 0
+        mttr_ms_avg: 0,
       },
       faultInjected: false,
-      
+
       // Actions
-      setUser: (user: any) => {
+      setUser: (user: { id: string; email?: string } | null) => {
         set({ user, isAuthenticated: !!user });
       },
-      
+
       setSidebarOpen: (open: boolean) => {
         set({ sidebarOpen: open });
       },
-      
+
       setCurrentSite: (site: string | null) => {
         set({ currentSite: site });
       },
-      
+
       setSelectedRobot: (robot: string | null) => {
         set({ selectedRobot: robot });
       },
-      
+
       setSelectedMission: (mission: string | null) => {
         set({ selectedMission: mission });
       },
-      
+
       setRealtimeConnected: (connected: boolean) => {
         set({ isRealtimeConnected: connected });
       },
-      
+
       setTelemetryEnabled: (enabled: boolean) => {
         set({ telemetryEnabled: enabled });
       },
@@ -135,8 +135,8 @@ export const useAppStore = create<AppState>()(
           isAdapterConnected: connected,
           adapterConnectionStatus: {
             ...adapterConnectionStatus,
-            [adapterType]: connected
-          }
+            [adapterType]: connected,
+          },
         });
       },
 
@@ -145,62 +145,70 @@ export const useAppStore = create<AppState>()(
         set({
           adapterConnectionStatus: {
             ...adapterConnectionStatus,
-            [type]: connected
-          }
+            [type]: connected,
+          },
         });
       },
 
       setSites: (sites: Site[]) => {
-        set(state => ({ sites, currentSite: sites.some(site => site.id === state.currentSite) ? state.currentSite : sites[0]?.id ?? null }));
+        set((state) => ({
+          sites,
+          currentSite: sites.some((site) => site.id === state.currentSite)
+            ? state.currentSite
+            : (sites[0]?.id ?? null),
+        }));
       },
-      
+
       setRobots: (robots: Robot[]) => {
         set({ robots });
       },
-      
+
       setMissions: (missions: Mission[]) => {
         set({ missions });
       },
-      
+
       addEvent: (eventMessage: EventMessage | Event) => {
-        const event: Event = "msg" in eventMessage ? {
-          id: crypto.randomUUID(),
-          type: 'SYSTEM',
-          payload: {
-            msg: eventMessage.msg,
-            level: eventMessage.level,
-            ...eventMessage.payload
-          },
-          ts: new Date(eventMessage.ts).toISOString()
-        } : eventMessage;
-        
+        const event: Event =
+          'msg' in eventMessage
+            ? {
+                id: crypto.randomUUID(),
+                type: 'SYSTEM',
+                payload: {
+                  msg: eventMessage.msg,
+                  level: eventMessage.level,
+                  ...eventMessage.payload,
+                },
+                ts: new Date(eventMessage.ts).toISOString(),
+              }
+            : eventMessage;
+
         set((state) => ({
-          events: [event, ...state.events].slice(0, 1000) // Keep last 1000 events
+          events: [event, ...state.events].slice(0, 1000), // Keep last 1000 events
         }));
       },
-      
+
       addTelemetry: (data: TelemetryData) => {
         set((state) => ({
-          telemetryBuffer: [...state.telemetryBuffer, data].slice(-100) // Keep last 100 telemetry points
+          telemetryBuffer: [...state.telemetryBuffer, data].slice(-100), // Keep last 100 telemetry points
         }));
       },
-      
+
       updateKpi: (kpiUpdate: Partial<KPI>) => {
         set((state) => ({
-          kpi: { ...state.kpi, ...kpiUpdate }
+          kpi: { ...state.kpi, ...kpiUpdate },
         }));
       },
-      
+
       setFaultInjected: (injected: boolean) => {
         set({ faultInjected: injected });
       },
-      
+
       clearEvents: () => {
         set({ events: [] });
-      }
+      },
     }),
     {
-      name: 'app-store'
+      name: 'app-store',
     }
   )
 );

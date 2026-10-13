@@ -7,15 +7,18 @@ const RobotPanel: React.FC = () => {
 
   const siteRobots = robots.filter((robot) => robot.site_id === currentSite);
 
-
-
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'ACTIVE': return <Zap className="w-3 h-3 text-green-500" />;
-      case 'CHARGING': return <Plug className="w-3 h-3 text-yellow-500" />;
-      case 'ERROR': return <AlertTriangle className="w-3 h-3 text-red-500" />;
-      case 'BLOCKED': return <AlertTriangle className="w-3 h-3 text-orange-500" />;
-      default: return <Circle className="w-3 h-3 text-gray-400" />;
+      case 'ACTIVE':
+        return <Zap className="w-3 h-3 text-green-500" />;
+      case 'CHARGING':
+        return <Plug className="w-3 h-3 text-yellow-500" />;
+      case 'ERROR':
+        return <AlertTriangle className="w-3 h-3 text-red-500" />;
+      case 'BLOCKED':
+        return <AlertTriangle className="w-3 h-3 text-orange-500" />;
+      default:
+        return <Circle className="w-3 h-3 text-gray-400" />;
     }
   };
 
@@ -33,10 +36,12 @@ const RobotPanel: React.FC = () => {
         </div>
         <div className="flex items-center space-x-3 text-xs">
           <div className="w-3 h-3 bg-black rounded-full" />
-          <span className="text-gray-500">{siteRobots.filter(r => r.status === 'ACTIVE').length} active</span>
+          <span className="text-gray-500">
+            {siteRobots.filter((r) => r.status === 'ACTIVE').length} active
+          </span>
         </div>
       </div>
-      
+
       <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
         {siteRobots.map((robot) => (
           <button
@@ -54,11 +59,15 @@ const RobotPanel: React.FC = () => {
                 <span className="font-semibold font-mono text-base">{robot.id}</span>
               </div>
               <div className="flex items-center space-x-3">
-                <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-mono ${
-                  robot.battery > 0.6 ? 'bg-gray-100 text-black' :
-                  robot.battery > 0.3 ? 'bg-gray-200 text-black' :
-                  'bg-gray-300 text-black'
-                }`}>
+                <div
+                  className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-mono ${
+                    robot.battery > 0.6
+                      ? 'bg-gray-100 text-black'
+                      : robot.battery > 0.3
+                        ? 'bg-gray-200 text-black'
+                        : 'bg-gray-300 text-black'
+                  }`}
+                >
                   <Battery className="w-4 h-4" />
                   <span>{Math.round(robot.battery * 100)}%</span>
                 </div>
@@ -66,14 +75,22 @@ const RobotPanel: React.FC = () => {
             </div>
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center space-x-3">
-                <span className={`px-3 py-1 rounded-full font-semibold border ${
-                  selectedRobot === robot.id ? 'bg-white text-black border-white' : 'bg-gray-100 text-black border-gray-200'
-                }`}>
+                <span
+                  className={`px-3 py-1 rounded-full font-semibold border ${
+                    selectedRobot === robot.id
+                      ? 'bg-white text-black border-white'
+                      : 'bg-gray-100 text-black border-gray-200'
+                  }`}
+                >
                   {robot.status}
                 </span>
-                <span className={`px-2 py-1 text-xs rounded border ${
-                  selectedRobot === robot.id ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-600 border-gray-300'
-                }`}>
+                <span
+                  className={`px-2 py-1 text-xs rounded border ${
+                    selectedRobot === robot.id
+                      ? 'bg-gray-800 text-white border-gray-700'
+                      : 'bg-white text-gray-600 border-gray-300'
+                  }`}
+                >
                   {robot.vendor.toUpperCase()}
                 </span>
               </div>
@@ -81,11 +98,11 @@ const RobotPanel: React.FC = () => {
                 ({robot.pose.x.toFixed(1)}, {robot.pose.y.toFixed(1)})
               </span>
             </div>
-            
+
             {/* Battery level bar */}
             <div className="mt-3">
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
+                <div
                   className={`h-2 rounded-full transition-all duration-300 ${
                     selectedRobot === robot.id ? 'bg-white' : 'bg-black'
                   }`}
@@ -95,7 +112,7 @@ const RobotPanel: React.FC = () => {
             </div>
           </button>
         ))}
-        
+
         {siteRobots.length === 0 && (
           <div className="text-center text-gray-500 py-12">
             <Bot className="w-12 h-12 mx-auto mb-4 opacity-50" />

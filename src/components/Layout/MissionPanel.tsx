@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { Target, Plus, Clock, CheckCircle, AlertCircle, Play, Pause, RotateCcw } from 'lucide-react';
+import {
+  Target,
+  Plus,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Play,
+  Pause,
+  RotateCcw,
+} from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import MissionDialog from '../Mission/MissionDialog';
 
@@ -11,21 +20,25 @@ const MissionPanel: React.FC = () => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed': return <CheckCircle className="w-3 h-3 text-green-500" />;
-      case 'failed': return <AlertCircle className="w-3 h-3 text-red-500" />;
-      case 'active': return <Play className="w-3 h-3 text-blue-500" />;
-      case 'planning': return <Clock className="w-3 h-3 text-yellow-500" />;
-      default: return <Pause className="w-3 h-3 text-gray-400" />;
+      case 'completed':
+        return <CheckCircle className="w-3 h-3 text-green-500" />;
+      case 'failed':
+        return <AlertCircle className="w-3 h-3 text-red-500" />;
+      case 'active':
+        return <Play className="w-3 h-3 text-blue-500" />;
+      case 'planning':
+        return <Clock className="w-3 h-3 text-yellow-500" />;
+      default:
+        return <Pause className="w-3 h-3 text-gray-400" />;
     }
   };
-
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMinutes = Math.floor(diffMs / 60000);
-    
+
     if (diffMinutes < 60) return `${diffMinutes}m ago`;
     const diffHours = Math.floor(diffMinutes / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
@@ -48,7 +61,9 @@ const MissionPanel: React.FC = () => {
         <div className="flex items-center space-x-6">
           <div className="flex items-center space-x-3 text-xs">
             <div className="w-3 h-3 bg-black rounded-full" />
-            <span className="text-gray-500">{siteMissions.filter(m => m.status === 'active').length} active</span>
+            <span className="text-gray-500">
+              {siteMissions.filter((m) => m.status === 'active').length} active
+            </span>
           </div>
           <button
             onClick={() => setShowDialog(true)}
@@ -59,7 +74,7 @@ const MissionPanel: React.FC = () => {
           </button>
         </div>
       </div>
-      
+
       <div className="space-y-3 flex-1 overflow-y-auto custom-scrollbar">
         {siteMissions.map((mission) => (
           <button
@@ -76,23 +91,25 @@ const MissionPanel: React.FC = () => {
                 {getStatusIcon(mission.status)}
                 <span className="font-semibold text-base font-mono">#{mission.id.slice(-6)}</span>
               </div>
-              <span className="text-sm opacity-60">
-                {formatTime(mission.created_at)}
-              </span>
+              <span className="text-sm opacity-60">{formatTime(mission.created_at)}</span>
             </div>
-            <div className="text-base mb-3 line-clamp-2 leading-relaxed">
-              {mission.nl}
-            </div>
+            <div className="text-base mb-3 line-clamp-2 leading-relaxed">{mission.nl}</div>
             <div className="flex items-center justify-between">
-              <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${
-                selectedMission === mission.id ? 'bg-white text-black border-white' : 'bg-gray-100 text-black border-gray-200'
-              }`}>
+              <span
+                className={`px-3 py-1 rounded-full text-sm font-semibold border ${
+                  selectedMission === mission.id
+                    ? 'bg-white text-black border-white'
+                    : 'bg-gray-100 text-black border-gray-200'
+                }`}
+              >
                 {mission.status.toUpperCase()}
               </span>
               {kpi.replans_count > 0 && (
-                <div className={`flex items-center space-x-2 text-sm ${
-                  selectedMission === mission.id ? 'text-white' : 'text-black'
-                }`}>
+                <div
+                  className={`flex items-center space-x-2 text-sm ${
+                    selectedMission === mission.id ? 'text-white' : 'text-black'
+                  }`}
+                >
                   <RotateCcw className="w-4 h-4" />
                   <span>Replanned</span>
                 </div>
@@ -100,7 +117,7 @@ const MissionPanel: React.FC = () => {
             </div>
           </button>
         ))}
-        
+
         {siteMissions.length === 0 && (
           <div className="text-center text-gray-500 py-12">
             <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -110,10 +127,7 @@ const MissionPanel: React.FC = () => {
         )}
       </div>
 
-      <MissionDialog 
-        isOpen={showDialog} 
-        onClose={() => setShowDialog(false)} 
-      />
+      <MissionDialog isOpen={showDialog} onClose={() => setShowDialog(false)} />
     </div>
   );
 };

@@ -17,55 +17,10 @@ const DevPanel: React.FC = () => {
     adapterConnectionStatus,
     addEvent,
     setRobots,
-    robots
   } = useAppStore();
 
-  const handleAdapterChange = async (newType: AdapterType) => {
-    const oldAdapter = adapters[adapterType];
-    const newAdapter = adapters[newType];
-
-    try {
-      oldAdapter.disconnect();
-      setAdapterConnected(false);
-
-      setAdapter(newType);
-
-      newAdapter.subscribe(
-        (telemetry) => {
-          setRobots(
-            robots.map((r) =>
-              r.id === telemetry.robot_id
-                ? {
-                    ...r,
-                    pose: telemetry.pose,
-                    battery: telemetry.battery,
-                    status: telemetry.status,
-                    updated_at: new Date(telemetry.ts).toISOString()
-                  }
-                : r
-            )
-          );
-        },
-        (event) => {
-          addEvent(event);
-        }
-      );
-
-      await newAdapter.connect();
-      setAdapterConnected(true);
-
-      if (newType === 'mock' && robots.length > 0) {
-        const mockAdapter = adapters.mock as any;
-        if (mockAdapter.startSimulation) {
-          mockAdapter.startSimulation(robots.map((r) => r.id));
-        }
-      }
-
-      toast.success(`Switched to ${newType.toUpperCase()} adapter`);
-    } catch (error) {
-      toast.error(`Failed to connect: ${error instanceof Error ? error.message : String(error)}`);
-      setAdapterConnected(false);
-    }
+  const handleAdapterChange = (newType: AdapterType) => {
+    setAdapter(newType);
   };
 
   const handlePing = async () => {
@@ -73,7 +28,7 @@ const DevPanel: React.FC = () => {
       ts: Date.now(),
       level: 'INFO',
       msg: `[PING] Testing ${adapterType.toUpperCase()} adapter...`,
-      payload: { adapter: adapterType }
+      payload: { adapter: adapterType },
     });
 
     toast.promise(
@@ -89,7 +44,7 @@ const DevPanel: React.FC = () => {
       {
         loading: 'Pinging adapter...',
         success: `${adapterType.toUpperCase()} adapter is alive`,
-        error: `${adapterType.toUpperCase()} adapter not responding`
+        error: `${adapterType.toUpperCase()} adapter not responding`,
       }
     );
   };
@@ -109,30 +64,32 @@ const DevPanel: React.FC = () => {
         no_go: [],
         time_window_start: null,
         time_window_end: null,
-        min_battery_pct: 0.2
+        min_battery_pct: 0.2,
       },
-      subtasks: [{
-        id: 'nav-1',
-        verb: 'navigate' as const,
-        args: {
-          from: null,
-          to: 'test-location',
-          item: null,
-          room: null,
-          zone: null,
-          dock: null
+      subtasks: [
+        {
+          id: 'nav-1',
+          verb: 'navigate' as const,
+          args: {
+            from: null,
+            to: 'test-location',
+            item: null,
+            room: null,
+            zone: null,
+            dock: null,
+          },
+          policy: {
+            reassign_on_blocked_s: 30,
+            retry_limit: 3,
+          },
         },
-        policy: {
-          reassign_on_blocked_s: 30,
-          retry_limit: 3
-        }
-      }],
+      ],
       robot_selection: {
         strategy: 'auto' as const,
         allow_vendors: ['vda5050'],
         include: [],
-        exclude: []
-      }
+        exclude: [],
+      },
     };
 
     try {
@@ -145,40 +102,50 @@ const DevPanel: React.FC = () => {
   };
 
   useEffect(() => {
+    let active = true;
     const adapter = adapters[adapterType];
+    setAdapterConnected(false);
     adapter.subscribe(
       (telemetry) => {
+        if (!active) return;
         setRobots(
-          robots.map((r) =>
+          useAppStore.getState().robots.map((r) =>
             r.id === telemetry.robot_id
               ? {
                   ...r,
                   pose: telemetry.pose,
                   battery: telemetry.battery,
                   status: telemetry.status,
-                  updated_at: new Date(telemetry.ts).toISOString()
+                  updated_at: new Date(telemetry.ts).toISOString(),
                 }
               : r
           )
         );
       },
       (event) => {
-        addEvent(event);
+        if (active) addEvent(event);
       }
     );
-
-    adapter.connect().then(() => setAdapterConnected(true)).catch(() => setAdapterConnected(false));
-
+    adapter
+      .connect()
+      .then(() => {
+        if (active) setAdapterConnected(true);
+      })
+      .catch(() => {
+        if (active) setAdapterConnected(false);
+      });
     return () => {
+      active = false;
       adapter.disconnect();
+      useAppStore.getState().setAdapterConnectionStatus(adapterType, false);
     };
-  }, []);
+  }, [adapterType, addEvent, setAdapterConnected, setRobots]);
 
   const adapterOptions: Array<{ value: AdapterType; label: string }> = [
     { value: 'mock', label: 'Mock' },
     { value: 'ros', label: 'ROS2' },
     { value: 'rmf', label: 'RMF' },
-    { value: 'vda5050', label: 'VDA-5050' }
+    { value: 'vda5050', label: 'VDA-5050' },
   ];
 
   return (
@@ -200,7 +167,7 @@ const DevPanel: React.FC = () => {
             onChange={(e) => handleAdapterChange(e.target.value as AdapterType)}
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            {adapterOptions.map(opt => (
+            {adapterOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label} {adapterConnectionStatus[opt.value] ? '•' : '○'}
               </option>
@@ -211,12 +178,18 @@ const DevPanel: React.FC = () => {
         {/* Connection Status */}
         <div className="bg-gray-50 rounded p-3 space-y-2">
           <div className="text-xs font-medium text-gray-600 mb-2">Connection Status</div>
-          {adapterOptions.map(opt => (
+          {adapterOptions.map((opt) => (
             <div key={opt.value} className="flex items-center justify-between text-xs">
               <span className="text-gray-600">{opt.label}</span>
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${adapterConnectionStatus[opt.value] ? 'bg-green-500' : 'bg-gray-300'}`} />
-                <span className={adapterConnectionStatus[opt.value] ? 'text-green-600' : 'text-gray-400'}>
+                <div
+                  className={`w-2 h-2 rounded-full ${adapterConnectionStatus[opt.value] ? 'bg-green-500' : 'bg-gray-300'}`}
+                />
+                <span
+                  className={
+                    adapterConnectionStatus[opt.value] ? 'text-green-600' : 'text-gray-400'
+                  }
+                >
                   {adapterConnectionStatus[opt.value] ? 'Connected' : 'Disconnected'}
                 </span>
               </div>

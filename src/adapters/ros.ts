@@ -28,7 +28,7 @@ class ROSAdapter implements Adapter {
             ts: Date.now(),
             level: 'INFO',
             msg: `[ROS] Connected to ${this.wsUrl}`,
-            payload: { url: this.wsUrl }
+            payload: { url: this.wsUrl },
           });
           resolve();
         };
@@ -38,7 +38,7 @@ class ROSAdapter implements Adapter {
             ts: Date.now(),
             level: 'ERROR',
             msg: '[ROS] WebSocket error',
-            payload: { error: error.toString() }
+            payload: { error: error.toString() },
           });
           reject(new Error('WebSocket connection failed'));
         };
@@ -48,7 +48,7 @@ class ROSAdapter implements Adapter {
             ts: Date.now(),
             level: 'WARN',
             msg: '[ROS] Connection closed',
-            payload: {}
+            payload: {},
           });
 
           if (this.shouldReconnect) {
@@ -57,7 +57,7 @@ class ROSAdapter implements Adapter {
                 ts: Date.now(),
                 level: 'INFO',
                 msg: '[ROS] Attempting reconnect...',
-                payload: {}
+                payload: {},
               });
               this.connect().catch(() => {});
             }, 5000);
@@ -79,8 +79,8 @@ class ROSAdapter implements Adapter {
                 msg: '[ROS] Invalid telemetry message',
                 payload: {
                   error: parsed.error.message,
-                  data
-                }
+                  data,
+                },
               });
             }
           } catch (error) {
@@ -90,8 +90,8 @@ class ROSAdapter implements Adapter {
               msg: '[ROS] Failed to parse message',
               payload: {
                 error: error instanceof Error ? error.message : String(error),
-                raw: event.data
-              }
+                raw: event.data,
+              },
             });
           }
         };
@@ -101,13 +101,12 @@ class ROSAdapter implements Adapter {
             reject(new Error('Connection timeout'));
           }
         }, 10000);
-
       } catch (error) {
         this.onEvent?.({
           ts: Date.now(),
           level: 'ERROR',
           msg: '[ROS] Connection failed',
-          payload: { error: error instanceof Error ? error.message : String(error) }
+          payload: { error: error instanceof Error ? error.message : String(error) },
         });
         reject(error);
       }
@@ -131,7 +130,7 @@ class ROSAdapter implements Adapter {
       ts: Date.now(),
       level: 'INFO',
       msg: '[ROS] Adapter disconnected',
-      payload: {}
+      payload: {},
     });
   }
 
@@ -150,7 +149,7 @@ class ROSAdapter implements Adapter {
 
     const message = {
       type: 'mission',
-      plan: mission
+      plan: mission,
     };
 
     this.ws.send(JSON.stringify(message));
@@ -159,7 +158,7 @@ class ROSAdapter implements Adapter {
       ts: Date.now(),
       level: 'INFO',
       msg: `[ROS] Mission sent: ${mission.natural_language}`,
-      payload: { mission_id: mission.mission_id }
+      payload: { mission_id: mission.mission_id },
     });
   }
 }

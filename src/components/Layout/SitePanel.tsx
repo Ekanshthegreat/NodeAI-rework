@@ -29,7 +29,7 @@ const SitePanel: React.FC = () => {
           </button>
         )}
       </div>
-      
+
       <div className="space-y-3">
         {sites.map((site) => (
           <button
@@ -42,25 +42,22 @@ const SitePanel: React.FC = () => {
             }`}
           >
             <div className="flex items-center space-x-4">
-              <div className={`w-2 h-2 rounded-full ${
-                currentSite === site.id ? 'bg-white' : 'bg-gray-400'
-              }`} />
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  currentSite === site.id ? 'bg-white' : 'bg-gray-400'
+                }`}
+              />
               <div className="flex-1">
                 <div className="font-semibold text-base">{site.name}</div>
-                <div className="text-sm opacity-60 font-mono mt-1">
-                  {site.id}
-                </div>
+                <div className="text-sm opacity-60 font-mono mt-1">{site.id}</div>
               </div>
               <MapPin className="w-5 h-5 opacity-40" />
             </div>
           </button>
         ))}
       </div>
-      
-      <MapSettingsPanel 
-        isOpen={showMapSettings} 
-        onClose={() => setShowMapSettings(false)} 
-      />
+
+      <MapSettingsPanel isOpen={showMapSettings} onClose={() => setShowMapSettings(false)} />
     </div>
   );
 };

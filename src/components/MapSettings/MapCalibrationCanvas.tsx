@@ -57,9 +57,9 @@ const MapCalibrationCanvas: React.FC<MapCalibrationCanvasProps> = ({
       // Calculate scaling to fit canvas while maintaining aspect ratio
       const canvasAspect = canvas.width / canvas.height;
       const imageAspect = image.width / image.height;
-      
+
       let drawWidth, drawHeight, offsetX, offsetY;
-      
+
       if (imageAspect > canvasAspect) {
         // Image is wider than canvas
         drawWidth = canvas.width;
@@ -85,14 +85,14 @@ const MapCalibrationCanvas: React.FC<MapCalibrationCanvasProps> = ({
 
       // Draw calibration points
       calibrationPoints.forEach((point, index) => {
-        const x = offsetX + (point[0] * drawWidth / image.width);
-        const y = offsetY + (point[1] * drawHeight / image.height);
-        
+        const x = offsetX + (point[0] * drawWidth) / image.width;
+        const y = offsetY + (point[1] * drawHeight) / image.height;
+
         ctx.fillStyle = index === 0 ? '#ef4444' : '#10b981';
         ctx.beginPath();
         ctx.arc(x, y, 8, 0, 2 * Math.PI);
         ctx.fill();
-        
+
         // Draw label
         ctx.fillStyle = 'white';
         ctx.font = '12px monospace';
@@ -103,12 +103,12 @@ const MapCalibrationCanvas: React.FC<MapCalibrationCanvasProps> = ({
       if (calibrationPoints.length >= 2) {
         const p1 = calibrationPoints[0];
         const p2 = calibrationPoints[1];
-        
-        const x1 = offsetX + (p1[0] * drawWidth / image.width);
-        const y1 = offsetY + (p1[1] * drawHeight / image.height);
-        const x2 = offsetX + (p2[0] * drawWidth / image.width);
-        const y2 = offsetY + (p2[1] * drawHeight / image.height);
-        
+
+        const x1 = offsetX + (p1[0] * drawWidth) / image.width;
+        const y1 = offsetY + (p1[1] * drawHeight) / image.height;
+        const x2 = offsetX + (p2[0] * drawWidth) / image.width;
+        const y2 = offsetY + (p2[1] * drawHeight) / image.height;
+
         ctx.strokeStyle = '#3b82f6';
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 5]);
@@ -121,9 +121,9 @@ const MapCalibrationCanvas: React.FC<MapCalibrationCanvasProps> = ({
 
       // Draw origin
       if (origin) {
-        const x = offsetX + (origin[0] * drawWidth / image.width);
-        const y = offsetY + (origin[1] * drawHeight / image.height);
-        
+        const x = offsetX + (origin[0] * drawWidth) / image.width;
+        const y = offsetY + (origin[1] * drawHeight) / image.height;
+
         ctx.strokeStyle = '#f59e0b';
         ctx.lineWidth = 3;
         ctx.beginPath();
@@ -132,7 +132,7 @@ const MapCalibrationCanvas: React.FC<MapCalibrationCanvasProps> = ({
         ctx.moveTo(x, y - 10);
         ctx.lineTo(x, y + 10);
         ctx.stroke();
-        
+
         // Draw label
         ctx.fillStyle = '#f59e0b';
         ctx.font = '12px monospace';
@@ -142,7 +142,7 @@ const MapCalibrationCanvas: React.FC<MapCalibrationCanvasProps> = ({
       // Draw placeholder
       ctx.fillStyle = '#374151';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
+
       ctx.fillStyle = '#9ca3af';
       ctx.font = '16px sans-serif';
       ctx.textAlign = 'center';
@@ -195,16 +195,15 @@ const MapCalibrationCanvas: React.FC<MapCalibrationCanvasProps> = ({
         }`}
         style={{ maxHeight: '400px' }}
       />
-      
+
       {isCalibrating && (
         <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
           {calibrationPoints.length < 2
             ? `Click point ${calibrationPoints.length + 1} for calibration`
-            : 'Enter distance and calculate scale'
-          }
+            : 'Enter distance and calculate scale'}
         </div>
       )}
-      
+
       {!isCalibrating && (
         <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
           Click to set origin point

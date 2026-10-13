@@ -29,7 +29,7 @@ class RMFAdapter implements Adapter {
             ts: Date.now(),
             level: 'INFO',
             msg: `[RMF] Connected to ${this.wsUrl}`,
-            payload: { url: this.wsUrl }
+            payload: { url: this.wsUrl },
           });
 
           this.startHeartbeat();
@@ -41,7 +41,7 @@ class RMFAdapter implements Adapter {
             ts: Date.now(),
             level: 'ERROR',
             msg: '[RMF] WebSocket error',
-            payload: { error: error.toString() }
+            payload: { error: error.toString() },
           });
           reject(new Error('WebSocket connection failed'));
         };
@@ -52,7 +52,7 @@ class RMFAdapter implements Adapter {
             ts: Date.now(),
             level: 'WARN',
             msg: '[RMF] Connection closed',
-            payload: {}
+            payload: {},
           });
 
           if (this.shouldReconnect) {
@@ -61,7 +61,7 @@ class RMFAdapter implements Adapter {
                 ts: Date.now(),
                 level: 'INFO',
                 msg: '[RMF] Attempting reconnect...',
-                payload: {}
+                payload: {},
               });
               this.connect().catch(() => {});
             }, 5000);
@@ -84,8 +84,8 @@ class RMFAdapter implements Adapter {
                   msg: '[RMF] Invalid telemetry message',
                   payload: {
                     error: parsed.error.message,
-                    data
-                  }
+                    data,
+                  },
                 });
               }
             } else {
@@ -93,7 +93,7 @@ class RMFAdapter implements Adapter {
                 ts: Date.now(),
                 level: 'INFO',
                 msg: `[RMF] Received message: ${data.type || 'unknown'}`,
-                payload: data
+                payload: data,
               });
             }
           } catch (error) {
@@ -103,8 +103,8 @@ class RMFAdapter implements Adapter {
               msg: '[RMF] Failed to parse message',
               payload: {
                 error: error instanceof Error ? error.message : String(error),
-                raw: event.data
-              }
+                raw: event.data,
+              },
             });
           }
         };
@@ -114,13 +114,12 @@ class RMFAdapter implements Adapter {
             reject(new Error('Connection timeout'));
           }
         }, 10000);
-
       } catch (error) {
         this.onEvent?.({
           ts: Date.now(),
           level: 'ERROR',
           msg: '[RMF] Connection failed',
-          payload: { error: error instanceof Error ? error.message : String(error) }
+          payload: { error: error instanceof Error ? error.message : String(error) },
         });
         reject(error);
       }
@@ -146,7 +145,7 @@ class RMFAdapter implements Adapter {
       ts: Date.now(),
       level: 'INFO',
       msg: '[RMF] Adapter disconnected',
-      payload: {}
+      payload: {},
     });
   }
 
@@ -165,7 +164,7 @@ class RMFAdapter implements Adapter {
 
     const message = {
       type: 'dispatch_mission',
-      plan: mission
+      plan: mission,
     };
 
     this.ws.send(JSON.stringify(message));
@@ -174,7 +173,7 @@ class RMFAdapter implements Adapter {
       ts: Date.now(),
       level: 'INFO',
       msg: `[RMF] Mission dispatched: ${mission.natural_language}`,
-      payload: { mission_id: mission.mission_id }
+      payload: { mission_id: mission.mission_id },
     });
   }
 

@@ -9,14 +9,7 @@ interface UseTelemetryOptions {
 export const useTelemetry = (options: UseTelemetryOptions = {}) => {
   const { enabled = true, interval = 1000 } = options;
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const { 
-    robots, 
-    setRobots, 
-    addEvent, 
-    addTelemetry, 
-    updateKpi,
-    telemetryEnabled 
-  } = useAppStore();
+  const { robots, setRobots, addEvent, addTelemetry, updateKpi, telemetryEnabled } = useAppStore();
 
   useEffect(() => {
     if (!enabled || !telemetryEnabled || robots.length === 0) {
@@ -27,11 +20,11 @@ export const useTelemetry = (options: UseTelemetryOptions = {}) => {
       ts: Date.now(),
       level: 'INFO',
       msg: '[TELEMETRY] Starting telemetry simulation',
-      payload: { robot_count: robots.length }
+      payload: { robot_count: robots.length },
     });
 
     intervalRef.current = setInterval(() => {
-      const updatedRobots = robots.map(robot => {
+      const updatedRobots = robots.map((robot) => {
         // Simple random walk movement
         const deltaX = (Math.random() - 0.5) * 0.5;
         const deltaY = (Math.random() - 0.5) * 0.5;
@@ -40,12 +33,12 @@ export const useTelemetry = (options: UseTelemetryOptions = {}) => {
         const newPose = {
           x: robot.pose.x + deltaX,
           y: robot.pose.y + deltaY,
-          theta: robot.pose.theta + deltaTheta
+          theta: robot.pose.theta + deltaTheta,
         };
 
         // Slowly drain battery
         const newBattery = Math.max(0, robot.battery - 0.001);
-        
+
         // Change status based on battery
         let newStatus = robot.status;
         if (newBattery < 0.2 && robot.status !== 'CHARGING') {
@@ -59,7 +52,7 @@ export const useTelemetry = (options: UseTelemetryOptions = {}) => {
           pose: newPose,
           battery: newBattery,
           status: newStatus,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         };
 
         // Add telemetry data
@@ -69,7 +62,7 @@ export const useTelemetry = (options: UseTelemetryOptions = {}) => {
           battery: newBattery,
           status: newStatus,
           velocity: Math.sqrt(deltaX * deltaX + deltaY * deltaY),
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
 
         return updatedRobot;
@@ -78,15 +71,15 @@ export const useTelemetry = (options: UseTelemetryOptions = {}) => {
       setRobots(updatedRobots);
 
       // Update KPIs
-      const activeRobots = updatedRobots.filter(r => r.status === 'ACTIVE').length;
-      const batteryAverage = updatedRobots.reduce((sum, r) => sum + r.battery, 0) / updatedRobots.length;
+      const activeRobots = updatedRobots.filter((r) => r.status === 'ACTIVE').length;
+      const batteryAverage =
+        updatedRobots.reduce((sum, r) => sum + r.battery, 0) / updatedRobots.length;
 
       updateKpi({
         totalRobots: updatedRobots.length,
         activeRobots,
-        batteryAverage
+        batteryAverage,
       });
-
     }, interval);
 
     return () => {
@@ -99,6 +92,6 @@ export const useTelemetry = (options: UseTelemetryOptions = {}) => {
 
   return {
     isRunning: !!intervalRef.current,
-    robotCount: robots.length
+    robotCount: robots.length,
   };
 };

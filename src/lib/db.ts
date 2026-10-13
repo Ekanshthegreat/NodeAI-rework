@@ -2,13 +2,11 @@ import { supabase } from './supabase';
 import type { MissionPlan } from '../types';
 
 export async function saveMissionPlan(missionId: string, plan: MissionPlan): Promise<void> {
-  const { error } = await supabase
-    .from('mission_plans')
-    .upsert({
-      mission_id: missionId,
-      plan_json: plan,
-      validated: true,
-    });
+  const { error } = await supabase.from('mission_plans').upsert({
+    mission_id: missionId,
+    plan_json: plan,
+    validated: true,
+  });
 
   if (error) throw error;
 }
