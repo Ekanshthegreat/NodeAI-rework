@@ -161,6 +161,6 @@ describe('recovery disabled', () => {
     expect(s.missions[0].status).toBe('failed');
     expect(s.missions[0].error).toContain('two-minute');
     expect(s.missions[0].retries).toBe(0);
-    expect(s.recordings.M001.frames.at(-1)?.status).toBe('failed');
+    expect(s.recordings.M001.frames.slice(-1)[0]?.status).toBe('failed');
   });
 });
