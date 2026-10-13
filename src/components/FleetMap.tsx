@@ -17,6 +17,16 @@ export default function FleetMap({
   selectedRobot?: string | null;
   onSelect?: (id: string) => void;
 }) {
+  const labels: { x: number; y: number }[] = [];
+  for (const robot of robots) {
+    const px = x(robot.pose.x),
+      py = y(robot.pose.y);
+    const offset =
+      [23, -17, 40, -34].find((dy) =>
+        labels.every((label) => Math.abs(label.x - px) >= 72 || Math.abs(label.y - py - dy) >= 15)
+      ) ?? 57;
+    labels.push({ x: px, y: py + offset });
+  }
   return (
     <svg
       className="fleet-map"
@@ -77,7 +87,7 @@ export default function FleetMap({
           </g>
         );
       })}
-      {robots.map((r) => (
+      {robots.map((r, index) => (
         <g
           key={r.id}
           onClick={() => onSelect?.(r.id)}
@@ -105,7 +115,7 @@ export default function FleetMap({
           />
           <text
             x={x(r.pose.x)}
-            y={y(r.pose.y) + 23}
+            y={labels[index].y}
             textAnchor="middle"
             fontSize="11"
             fontWeight="600"
