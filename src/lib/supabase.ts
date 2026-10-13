@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../types/database';
 import type { Site, Robot, Mission, MissionPlan } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -184,7 +183,7 @@ export async function uploadMapImage(file: File, siteId: string): Promise<string
 
   const fileName = `${siteId}-${Date.now()}.${file.name.split('.').pop()}`;
   
-  const { data, error } = await supabase.storage
+  const { error } = await supabase.storage
     .from(storageBucket)
     .upload(fileName, file, {
       cacheControl: '3600',

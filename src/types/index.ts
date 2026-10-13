@@ -4,7 +4,9 @@ export interface Site {
   map_url: string;
   origin: { x: number; y: number };
   scale_m_per_px: number;
-  created_at: string;
+  obstacles?: Array<{ id: string; rect: { x: number; y: number; w: number; h: number } }>;
+  noGo?: Array<{ id: string; poly: Array<{ x: number; y: number }> }>;
+  created_at?: string;
 }
 
 export interface Robot {
@@ -15,6 +17,7 @@ export interface Robot {
   battery: number;
   status: 'IDLE' | 'ACTIVE' | 'ERROR' | 'CHARGING' | 'BLOCKED';
   updated_at: string;
+  capabilities?: string[];
 }
 
 export interface Mission {
@@ -83,6 +86,7 @@ export interface TelemetryData {
   status: string;
   velocity: number;
   timestamp: number;
+  task_id?: string | null;
 }
 
 export interface TelemetryMessage {
@@ -106,4 +110,7 @@ export interface KPI {
   activeRobots: number;
   batteryAverage: number;
   uptime: number;
+  replans_count: number;
+  interventions_avoided: number;
+  mttr_ms_avg: number;
 }

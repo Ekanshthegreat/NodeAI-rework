@@ -7,22 +7,7 @@ const RobotPanel: React.FC = () => {
 
   const siteRobots = robots.filter((robot) => robot.site_id === currentSite);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'IDLE': return 'text-gray-400';
-      case 'ACTIVE': return 'text-green-500';
-      case 'ERROR': return 'text-red-500';
-      case 'CHARGING': return 'text-yellow-500';
-      case 'BLOCKED': return 'text-orange-500';
-      default: return 'text-gray-400';
-    }
-  };
 
-  const getBatteryColor = (battery: number) => {
-    if (battery > 0.6) return 'text-green-500';
-    if (battery > 0.3) return 'text-yellow-500';
-    return 'text-red-500';
-  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {

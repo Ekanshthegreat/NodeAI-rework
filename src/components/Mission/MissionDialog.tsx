@@ -42,7 +42,7 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
       });
       
       // Save to database
-      const { data: mission, error: missionError } = await supabase
+      const { error: missionError } = await supabase
         .from('missions')
         .insert({
           id: missionId,
@@ -77,7 +77,7 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
         id: missionId,
         site_id: currentSite,
         nl: naturalLanguage.trim(),
-        status: 'planning',
+        status: 'planning' as const,
         created_at: new Date().toISOString(),
       };
       
@@ -87,7 +87,7 @@ const MissionDialog: React.FC<MissionDialogProps> = ({ isOpen, onClose }) => {
       addEvent({
         id: `event-${Date.now()}`,
         mission_id: missionId,
-        robot_id: plan.robot_selection.include[0] || null,
+        robot_id: plan.robot_selection.include[0] || undefined,
         type: 'mission_event',
         payload: { action: 'created', priority },
         ts: new Date().toISOString(),

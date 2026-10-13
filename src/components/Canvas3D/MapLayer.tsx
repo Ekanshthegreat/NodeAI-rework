@@ -1,5 +1,4 @@
 import React, { useRef, useMemo, useEffect, useState } from 'react';
-import { useLoader } from '@react-three/fiber';
 import { TextureLoader } from 'three';
 import * as THREE from 'three';
 import type { Site } from '../../types';
@@ -136,7 +135,7 @@ const MapLayer: React.FC<MapLayerProps> = ({ site, visible = true }) => {
     const worldWidth = mapWidth * site.scale_m_per_px;
     const worldHeight = mapHeight * site.scale_m_per_px;
     
-    return [worldWidth, worldHeight];
+    return [worldWidth, worldHeight] as [number, number];
   }, [site.scale_m_per_px]);
   
   if (!visible || !textureLoaded) return null;

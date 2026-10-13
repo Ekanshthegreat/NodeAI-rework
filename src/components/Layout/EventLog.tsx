@@ -1,21 +1,11 @@
 import React from 'react';
-import { ScrollText, Circle, GitBranch, Activity, AlertTriangle, Info, Zap, Eye } from 'lucide-react';
+import { GitBranch, Activity, AlertTriangle, Info, Eye } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 
 const EventLog: React.FC = () => {
   const { telemetryBuffer, events } = useAppStore();
   const [selectedDiff, setSelectedDiff] = React.useState<any>(null);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'IDLE': return 'text-gray-400';
-      case 'ACTIVE': return 'text-green-500';
-      case 'ERROR': return 'text-red-500';
-      case 'CHARGING': return 'text-yellow-500';
-      case 'BLOCKED': return 'text-orange-500';
-      default: return 'text-gray-400';
-    }
-  };
 
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString();
@@ -43,9 +33,9 @@ const EventLog: React.FC = () => {
       
       <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
         {recentTelemetry.map((telemetry, index) => (
-          <div key={`${telemetry.robot_id}-${telemetry.ts}-${index}`} className="flex items-center space-x-4 text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <div key={`${telemetry.robot_id}-${telemetry.timestamp}-${index}`} className="flex items-center space-x-4 text-sm p-3 bg-gray-50 rounded-lg border border-gray-200">
             <span className="text-gray-600 font-mono text-sm min-w-[70px]">
-              {formatTime(telemetry.ts)}
+              {formatTime(telemetry.timestamp)}
             </span>
             
             <div className="w-3 h-3 rounded-full bg-black" />
@@ -98,12 +88,12 @@ const EventLog: React.FC = () => {
             
             <div className="flex-1 text-black text-sm">
               {typeof event.payload === 'object' && event.payload?.msg ? 
-                event.payload.msg : 
+                String(event.payload.msg) :
                 (event as any).msg || 'System event'
               }
             </div>
             
-            {event.payload?.before && event.payload?.after && (
+            {Boolean(event.payload?.before && event.payload?.after) && (
               <button
                 onClick={() => setSelectedDiff({ before: event.payload.before, after: event.payload.after })}
                 className="flex items-center space-x-1 text-sm text-black hover:text-gray-700 transition-colors"

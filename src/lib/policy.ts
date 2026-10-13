@@ -1,5 +1,4 @@
 import type { MissionPlan } from './schemas';
-import { compileNLToPlan } from './planner';
 import type { Robot } from '../types';
 
 // Global state for tracking robot stuck status
@@ -99,7 +98,7 @@ export async function maybeReplan(
   return newPlan;
 }
 
-export function evaluatePoliciesOnTick(now: number): void {
+export function evaluatePoliciesOnTick(_now: number): void {
   // This function is called periodically to evaluate policies
   // The main policy evaluation happens in the usePolicyEngine hook
   // This is just a placeholder for any global policy checks

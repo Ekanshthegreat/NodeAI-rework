@@ -33,11 +33,8 @@ export const Canvas3D: React.FC = () => {
           sectionThickness={1.5}
           fadeDistance={50}
           fadeStrength={1}
-          materialProps={{
-            color: '#d1d5db',
-            transparent: true,
-            opacity: 0.4,
-          }}
+          cellColor="#d1d5db"
+          sectionColor="#9ca3af"
         />
         
         {/* Scene Content */}

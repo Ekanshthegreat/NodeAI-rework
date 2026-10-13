@@ -16,7 +16,7 @@ const PathRenderer: React.FC = () => {
           if (!missionPath || !missionPath.waypoints.length) return null;
           
           const isSelected = selectedMission === mission.id;
-          const points = missionPath.waypoints.map(p => [p.x, 0.2, p.y]);
+          const points = missionPath.waypoints.map(p => [p.x, 0.2, p.y] as [number, number, number]);
           const color = isSelected ? '#3b82f6' : '#10b981';
           const opacity = isSelected ? 1.0 : 0.6;
           

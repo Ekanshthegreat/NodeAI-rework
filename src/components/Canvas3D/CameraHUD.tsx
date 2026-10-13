@@ -7,7 +7,7 @@ const CameraHUD: React.FC = () => {
   const { camera } = useThree();
   const { fps, cameraPosition, setFPS, setCameraPosition } = useSceneStore();
   
-  useFrame((state, delta) => {
+  useFrame((_state, delta) => {
     // Update FPS (smoothed)
     const currentFPS = 1 / delta;
     setFPS(Math.round(currentFPS * 0.1 + fps * 0.9));

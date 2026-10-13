@@ -5,7 +5,7 @@ interface SiteMapProps {
   site: Site;
 }
 
-const SiteMap: React.FC<SiteMapProps> = ({ site }) => {
+const SiteMap: React.FC<SiteMapProps> = ({ site: _site }) => {
   return (
     <group>
       {/* Floor */}

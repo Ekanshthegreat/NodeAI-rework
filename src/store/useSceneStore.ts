@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { Robot, Site } from '../types';
+import type { Robot } from '../types';
 
 export interface Path {
   id: string;
@@ -20,6 +20,16 @@ export interface Overlay {
 }
 
 interface SceneStore {
+  calibrationPoints: Array<[number, number]>;
+  calibrationDistance: number | null;
+  origin: [number, number] | null;
+  isCalibrating: boolean;
+  setCalibrationPoints: (points: Array<[number, number]>) => void;
+  addCalibrationPoint: (point: [number, number]) => void;
+  setCalibrationDistance: (distance: number | null) => void;
+  setOrigin: (origin: [number, number] | null) => void;
+  setIsCalibrating: (calibrating: boolean) => void;
+  resetCalibration: () => void;
   // Scene state
   selectedSiteId: string | null;
   robots: Robot[];
@@ -61,6 +71,10 @@ export const useSceneStore = create<SceneStore>()(
   devtools(
     (set, get) => ({
       // Initial state
+      calibrationPoints: [],
+      calibrationDistance: null,
+      origin: null,
+      isCalibrating: false,
       selectedSiteId: null,
       robots: [],
       paths: [],

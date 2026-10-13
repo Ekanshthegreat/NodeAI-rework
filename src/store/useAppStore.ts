@@ -12,9 +12,9 @@ interface AppState {
   sidebarOpen: boolean;
 
   // Current selections
-  currentSite: Site | null;
-  selectedRobot: Robot | null;
-  selectedMission: Mission | null;
+  currentSite: string | null;
+  selectedRobot: string | null;
+  selectedMission: string | null;
 
   // Connection state
   isRealtimeConnected: boolean;
@@ -39,9 +39,9 @@ interface AppState {
   // Actions
   setUser: (user: any) => void;
   setSidebarOpen: (open: boolean) => void;
-  setCurrentSite: (site: Site | null) => void;
-  setSelectedRobot: (robot: Robot | null) => void;
-  setSelectedMission: (mission: Mission | null) => void;
+  setCurrentSite: (site: string | null) => void;
+  setSelectedRobot: (robot: string | null) => void;
+  setSelectedMission: (mission: string | null) => void;
   setRealtimeConnected: (connected: boolean) => void;
   setTelemetryEnabled: (enabled: boolean) => void;
   setAdapter: (type: AdapterType) => void;
@@ -50,7 +50,7 @@ interface AppState {
   setSites: (sites: Site[]) => void;
   setRobots: (robots: Robot[]) => void;
   setMissions: (missions: Mission[]) => void;
-  addEvent: (event: EventMessage) => void;
+  addEvent: (event: EventMessage | Event) => void;
   addTelemetry: (data: TelemetryData) => void;
   updateKpi: (kpi: Partial<KPI>) => void;
   setFaultInjected: (injected: boolean) => void;
@@ -89,7 +89,10 @@ export const useAppStore = create<AppState>()(
         totalRobots: 0,
         activeRobots: 0,
         batteryAverage: 0,
-        uptime: 0
+        uptime: 0,
+        replans_count: 0,
+        interventions_avoided: 0,
+        mttr_ms_avg: 0
       },
       faultInjected: false,
       
@@ -102,15 +105,15 @@ export const useAppStore = create<AppState>()(
         set({ sidebarOpen: open });
       },
       
-      setCurrentSite: (site: Site | null) => {
+      setCurrentSite: (site: string | null) => {
         set({ currentSite: site });
       },
       
-      setSelectedRobot: (robot: Robot | null) => {
+      setSelectedRobot: (robot: string | null) => {
         set({ selectedRobot: robot });
       },
       
-      setSelectedMission: (mission: Mission | null) => {
+      setSelectedMission: (mission: string | null) => {
         set({ selectedMission: mission });
       },
       
@@ -148,7 +151,7 @@ export const useAppStore = create<AppState>()(
       },
 
       setSites: (sites: Site[]) => {
-        set({ sites });
+        set(state => ({ sites, currentSite: sites.some(site => site.id === state.currentSite) ? state.currentSite : sites[0]?.id ?? null }));
       },
       
       setRobots: (robots: Robot[]) => {
@@ -159,8 +162,8 @@ export const useAppStore = create<AppState>()(
         set({ missions });
       },
       
-      addEvent: (eventMessage: EventMessage) => {
-        const event: Event = {
+      addEvent: (eventMessage: EventMessage | Event) => {
+        const event: Event = "msg" in eventMessage ? {
           id: crypto.randomUUID(),
           type: 'SYSTEM',
           payload: {
@@ -169,7 +172,7 @@ export const useAppStore = create<AppState>()(
             ...eventMessage.payload
           },
           ts: new Date(eventMessage.ts).toISOString()
-        };
+        } : eventMessage;
         
         set((state) => ({
           events: [event, ...state.events].slice(0, 1000) // Keep last 1000 events

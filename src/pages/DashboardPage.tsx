@@ -10,12 +10,7 @@ const DashboardPage: React.FC = () => {
   const { setSites, setRobots, setMissions, addEvent } = useAppStore();
 
   // Enable telemetry for robot movement
-  useTelemetry({
-    updateInterval: 100,
-    movementSpeed: 0.5,
-    batteryDrainRate: 0.0001,
-    enableFaultInjection: true,
-  });
+  useTelemetry({ interval: 100 });
 
   // Enable policy engine for self-healing
   usePolicyEngine();

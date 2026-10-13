@@ -30,7 +30,7 @@ class VDA5050Adapter implements Adapter {
   private mqttUrl: string;
   private topicBase: string;
   private reconnectTimeout: NodeJS.Timeout | null = null;
-  private _shouldReconnect = false;
+
 
   constructor() {
     this.mqttUrl = import.meta.env.VITE_VDA_MQTT_URL || 'ws://localhost:9001';
@@ -40,7 +40,7 @@ class VDA5050Adapter implements Adapter {
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        this._shouldReconnect = true;
+
         this.client = mqtt.connect(this.mqttUrl, {
           reconnectPeriod: 5000,
           clean: true
@@ -172,7 +172,7 @@ class VDA5050Adapter implements Adapter {
   }
 
   disconnect(): void {
-    this._shouldReconnect = false;
+
 
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);

@@ -1,6 +1,5 @@
 import { nanoid } from 'nanoid';
 import { MissionPlan } from './schemas';
-import { compileMissionPath } from './planner_path';
 
 type CompileOpts = {
   defaultMinBattery?: number;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Globe, Settings, Building2 } from 'lucide-react';
+import { MapPin, Settings, Building2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import MapSettingsPanel from '../MapSettings/MapSettingsPanel';
 

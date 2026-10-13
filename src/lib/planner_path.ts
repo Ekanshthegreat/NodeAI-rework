@@ -295,7 +295,7 @@ function pointToLineDistance(
 
 // Mission path compilation
 export function compileMissionPath(
-  mission: any,
+  _mission: any,
   plan: any,
   robotPose: { x: number; y: number },
   obstacles: Obstacle[] = [],

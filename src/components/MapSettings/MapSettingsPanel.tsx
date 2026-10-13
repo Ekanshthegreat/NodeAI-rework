@@ -244,6 +244,8 @@ const MapSettingsPanel: React.FC<MapSettingsPanelProps> = ({ isOpen, onClose }) 
                 isCalibrating={isCalibrating}
                 calibrationPoints={calibrationPoints}
                 origin={origin}
+                onAddCalibrationPoint={addCalibrationPoint}
+                onSetOrigin={setOrigin}
               />
 
               {/* Calibration Controls */}
