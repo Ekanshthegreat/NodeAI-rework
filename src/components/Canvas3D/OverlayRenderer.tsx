@@ -4,7 +4,7 @@ import { useSceneStore } from '../../store/useSceneStore';
 
 const OverlayRenderer: React.FC = () => {
   const { overlays } = useSceneStore();
-  
+
   const getOverlayGeometry = (type: string) => {
     switch (type) {
       case 'waypoint':
@@ -16,11 +16,11 @@ const OverlayRenderer: React.FC = () => {
         return <sphereGeometry args={[0.15]} />;
     }
   };
-  
+
   return (
     <group>
       {overlays
-        .filter(overlay => overlay.visible)
+        .filter((overlay) => overlay.visible)
         .map((overlay) => (
           <group
             key={overlay.id}
@@ -37,7 +37,7 @@ const OverlayRenderer: React.FC = () => {
                 emissiveIntensity={0.2}
               />
             </mesh>
-            
+
             {/* Label */}
             <Text
               position={[0, 0.5, 0]}

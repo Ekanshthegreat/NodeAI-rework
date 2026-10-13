@@ -13,7 +13,7 @@ const SiteMap: React.FC<SiteMapProps> = ({ site: _site }) => {
         <boxGeometry args={[20, 0.1, 20]} />
         <meshStandardMaterial color="#374151" />
       </mesh>
-      
+
       {/* Walls (simplified warehouse layout) */}
       <group>
         {/* Outer walls */}
@@ -33,7 +33,7 @@ const SiteMap: React.FC<SiteMapProps> = ({ site: _site }) => {
           <boxGeometry args={[0.2, 2, 20]} />
           <meshStandardMaterial color="#1f2937" />
         </mesh>
-        
+
         {/* Interior structures */}
         <mesh position={[3, 0.5, 0]}>
           <boxGeometry args={[2, 1, 8]} />

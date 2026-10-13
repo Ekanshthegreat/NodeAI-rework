@@ -6,21 +6,21 @@ import { useSceneStore } from '../../store/useSceneStore';
 const CameraHUD: React.FC = () => {
   const { camera } = useThree();
   const { fps, cameraPosition, setFPS, setCameraPosition } = useSceneStore();
-  
+
   useFrame((_state, delta) => {
     // Update FPS (smoothed)
     const currentFPS = 1 / delta;
     setFPS(Math.round(currentFPS * 0.1 + fps * 0.9));
-    
+
     // Update camera position
     const pos = camera.position;
     setCameraPosition([
       Math.round(pos.x * 100) / 100,
       Math.round(pos.y * 100) / 100,
-      Math.round(pos.z * 100) / 100
+      Math.round(pos.z * 100) / 100,
     ]);
   });
-  
+
   return (
     <Html
       position={[0, 0, 0]}
@@ -36,7 +36,9 @@ const CameraHUD: React.FC = () => {
         <div className="space-y-1">
           <div className="flex justify-between items-center">
             <span className="text-slate-500">FPS:</span>
-            <span className={`font-bold ${fps < 30 ? 'text-red-400' : fps < 50 ? 'text-yellow-400' : 'text-green-400'}`}>
+            <span
+              className={`font-bold ${fps < 30 ? 'text-red-400' : fps < 50 ? 'text-yellow-400' : 'text-green-400'}`}
+            >
               {fps}
             </span>
           </div>

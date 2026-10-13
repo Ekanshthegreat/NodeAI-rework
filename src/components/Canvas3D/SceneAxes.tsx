@@ -3,12 +3,15 @@ import { Line } from '@react-three/drei';
 
 const SceneAxes: React.FC = () => {
   const axisLength = 5;
-  
+
   return (
     <group>
       {/* X-axis (Red) */}
       <Line
-        points={[[0, 0, 0], [axisLength, 0, 0]]}
+        points={[
+          [0, 0, 0],
+          [axisLength, 0, 0],
+        ]}
         color="red"
         lineWidth={3}
       />
@@ -16,10 +19,13 @@ const SceneAxes: React.FC = () => {
         <coneGeometry args={[0.1, 0.3]} />
         <meshBasicMaterial color="red" />
       </mesh>
-      
+
       {/* Y-axis (Green) */}
       <Line
-        points={[[0, 0, 0], [0, axisLength, 0]]}
+        points={[
+          [0, 0, 0],
+          [0, axisLength, 0],
+        ]}
         color="green"
         lineWidth={3}
       />
@@ -27,10 +33,13 @@ const SceneAxes: React.FC = () => {
         <coneGeometry args={[0.1, 0.3]} />
         <meshBasicMaterial color="green" />
       </mesh>
-      
+
       {/* Z-axis (Blue) */}
       <Line
-        points={[[0, 0, 0], [0, 0, axisLength]]}
+        points={[
+          [0, 0, 0],
+          [0, 0, axisLength],
+        ]}
         color="blue"
         lineWidth={3}
       />
@@ -38,7 +47,7 @@ const SceneAxes: React.FC = () => {
         <coneGeometry args={[0.1, 0.3]} />
         <meshBasicMaterial color="blue" />
       </mesh>
-      
+
       {/* Origin marker */}
       <mesh position={[0, 0, 0]}>
         <sphereGeometry args={[0.1]} />

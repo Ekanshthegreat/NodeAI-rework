@@ -22,7 +22,7 @@ export const Canvas3D: React.FC = () => {
         {/* Lighting */}
         <ambientLight intensity={0.6} />
         <directionalLight position={[10, 10, 10]} intensity={0.8} />
-        
+
         {/* Grid */}
         <Grid
           args={[50, 50]}
@@ -36,10 +36,10 @@ export const Canvas3D: React.FC = () => {
           cellColor="#d1d5db"
           sectionColor="#9ca3af"
         />
-        
+
         {/* Scene Content */}
         <Scene />
-        
+
         {/* Controls */}
         <OrbitControls
           enablePan={true}
