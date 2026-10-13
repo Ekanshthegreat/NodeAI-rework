@@ -677,3 +677,31 @@ p {
   color: #617083;
   background: #ffffff90;
 }
+
+.ros-connection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.ros-connection input {
+  flex: 1;
+  min-width: 180px;
+}
+.ros-target {
+  display: grid;
+  gap: 12px;
+}
+.ros-target label {
+  display: grid;
+  gap: 6px;
+}
+.ros-target input,
+.ros-target select,
+.ros-connection input {
+  font: inherit;
+  padding: 10px;
+  border: 1px solid #cbd3df;
+  border-radius: 6px;
+  max-width: 100%;
+}

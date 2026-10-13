@@ -16,6 +16,7 @@ export default function Header() {
           Mission control
         </NavLink>
         <NavLink to="/app/replay">Replay</NavLink>
+        <NavLink to="/app/ros">ROS 2</NavLink>
       </nav>
       <button className="secondary-button" onClick={() => setRunning(!running)}>
         {running ? <Pause size={16} /> : <Play size={16} />}{' '}

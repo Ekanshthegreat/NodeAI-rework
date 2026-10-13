@@ -1,0 +1,247 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { BridgeClient, type BridgeMessage, type RosRobot } from '../ros/client';
+export default function RosPage() {
+  const [address, setAddress] = useState('ws://127.0.0.1:8765');
+  const [connected, setConnected] = useState(false),
+    [connecting, setConnecting] = useState(false),
+    [error, setError] = useState('');
+  const [robots, setRobots] = useState<RosRobot[]>([]),
+    [selected, setSelected] = useState(''),
+    [events, setEvents] = useState<BridgeMessage[]>([]);
+  const [target, setTarget] = useState({ x: '1', y: '2', yaw: '0' }),
+    [pending, setPending] = useState<string | null>(null);
+  const [lastHeartbeat, setLastHeartbeat] = useState(0),
+    [now, setNow] = useState(Date.now());
+  const client = useRef<BridgeClient | null>(null);
+  useEffect(() => {
+    client.current = new BridgeClient(
+      (message) => {
+        if (message.type === 'robots') {
+          setRobots(message.robots);
+          setLastHeartbeat(Date.now());
+          setSelected((current) =>
+            message.robots.some((r) => r.id === current) ? current : (message.robots[0]?.id ?? '')
+          );
+        }
+        if (message.type === 'navigation' || message.type === 'error') {
+          setEvents((current) => [message, ...current].slice(0, 30));
+          if (message.type === 'error') setError(message.message);
+          if (
+            message.type === 'error' ||
+            ['succeeded', 'cancelled', 'rejected', 'failed'].includes(message.state)
+          )
+            setPending((current) => (current === message.request_id ? null : current));
+        }
+      },
+      (active) => {
+        setConnected(active);
+        if (!active) {
+          setRobots([]);
+          setPending(null);
+        }
+      },
+      setError
+    );
+    const timer = setInterval(() => setNow(Date.now()), 500);
+    return () => {
+      clearInterval(timer);
+      client.current?.disconnect();
+    };
+  }, []);
+  const robot = robots.find((r) => r.id === selected),
+    fresh = connected && now - lastHeartbeat < 3000;
+  const activeRequest = robot?.request_id ?? pending;
+  const connect = async () => {
+    setConnecting(true);
+    setError('');
+    try {
+      await client.current?.connect(address);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setConnecting(false);
+    }
+  };
+  const send = () => {
+    setError('');
+    try {
+      const id = crypto.randomUUID();
+      client.current?.navigate(
+        selected,
+        { x: Number(target.x), y: Number(target.y), yaw: Number(target.yaw) },
+        id
+      );
+      setPending(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return (
+    <div className="dashboard">
+      <header className="page-heading">
+        <div>
+          <p className="eyebrow">ROS 2 / Nav2</p>
+          <h1>ROS mission control</h1>
+          <p>Live localization, battery state and navigation action results.</p>
+        </div>
+        <Link to="/app" className="text-link">
+          Local simulation ↗
+        </Link>
+      </header>
+      <section className="panel">
+        <h2>Bridge connection</h2>
+        <div className="ros-connection">
+          <label htmlFor="ros-address">Loopback endpoint</label>
+          <input
+            id="ros-address"
+            value={address}
+            disabled={connected || connecting}
+            onChange={(e) => setAddress(e.target.value)}
+          />
+          <button
+            className="primary-button"
+            disabled={connecting}
+            onClick={() => (connected ? client.current?.disconnect() : void connect())}
+          >
+            {connected ? 'Disconnect' : connecting ? 'Connecting…' : 'Connect to ROS'}
+          </button>
+        </div>
+        <p role="status">
+          {connected
+            ? fresh
+              ? 'Connected · telemetry current'
+              : 'Connected · waiting for current telemetry'
+            : 'Disconnected'}
+        </p>
+        <p className="field-help">
+          Start the nodeai_bridge ROS package on the ROS host. Remote hosts can be reached through a
+          loopback SSH tunnel. Disconnecting the browser leaves outstanding Nav2 goals running.
+        </p>
+        {error && (
+          <p className="inline-error" role="alert">
+            {error}
+          </p>
+        )}
+      </section>
+      <div className="lower-grid">
+        <section className="panel">
+          <h2>ROS robots</h2>
+          {robots.length === 0 ? (
+            <p className="empty-state">Connect to the bridge to discover configured robots.</p>
+          ) : (
+            robots.map((r) => (
+              <article className="robot-card" key={r.id}>
+                <div className="robot-title">
+                  <strong>{r.id}</strong>
+                  <span className="status">{fresh ? r.state : 'stale'}</span>
+                </div>
+                <p>
+                  Frame {r.frame_id} · Battery{' '}
+                  {r.battery === null ? 'unknown' : `${Math.round(r.battery * 100)}%`}
+                </p>
+                <p>
+                  {r.pose
+                    ? `Pose ${r.pose.x.toFixed(2)}, ${r.pose.y.toFixed(2)} · yaw ${r.pose.yaw.toFixed(2)}`
+                    : 'Waiting for localization'}
+                </p>
+                <p className="field-help">
+                  {r.ready
+                    ? 'Nav2 ready'
+                    : 'Waiting for Nav2, fresh localization or adequate battery'}{' '}
+                  · Pose age{' '}
+                  {r.pose_age_seconds === null ? 'unknown' : `${r.pose_age_seconds.toFixed(1)}s`}
+                </p>
+              </article>
+            ))
+          )}
+        </section>
+        <section className="panel">
+          <h2>Navigate to a pose</h2>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              send();
+            }}
+            className="ros-target"
+          >
+            <label htmlFor="ros-robot">Robot</label>
+            <select id="ros-robot" value={selected} onChange={(e) => setSelected(e.target.value)}>
+              <option value="" disabled>
+                Select a robot
+              </option>
+              {robots.map((r) => (
+                <option key={r.id}>{r.id}</option>
+              ))}
+            </select>
+            {(['x', 'y', 'yaw'] as const).map((key) => (
+              <label key={key}>
+                {key === 'yaw' ? 'Yaw (radians)' : `${key.toUpperCase()} (metres)`}
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  value={target[key]}
+                  onChange={(e) => setTarget((t) => ({ ...t, [key]: e.target.value }))}
+                />
+              </label>
+            ))}
+            <p className="field-help">
+              Target coordinates use the robot’s configured ROS frame. Nav2 owns route planning and
+              obstacle avoidance.
+            </p>
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={!fresh || !robot?.ready || Boolean(activeRequest)}
+            >
+              Send Nav2 goal
+            </button>
+          </form>
+          {activeRequest && (
+            <div className="robot-actions">
+              <p className="field-help">Goal {activeRequest}</p>
+              <button
+                className="secondary-button"
+                disabled={!connected}
+                onClick={() => {
+                  try {
+                    client.current?.cancel(selected, activeRequest, crypto.randomUUID());
+                  } catch (e) {
+                    setError(String(e));
+                  }
+                }}
+              >
+                Cancel Nav2 goal
+              </button>
+            </div>
+          )}
+        </section>
+      </div>
+      <section className="panel event-panel">
+        <h2>Navigation events</h2>
+        <p className="field-help">
+          Acceptance means Nav2 received the goal; success appears only after the action result.
+          Unknown outcomes keep the robot occupied.
+        </p>
+        {events.length === 0 ? (
+          <p className="empty-state">No navigation events in this browser session.</p>
+        ) : (
+          <ol>
+            {events.map((e, i) => (
+              <li key={i}>
+                <span>
+                  {e.type === 'navigation'
+                    ? `${e.robot_id} · ${e.state} · ${e.request_id}${e.error ? ` · ${e.error}` : ''}`
+                    : e.type === 'error'
+                      ? e.message
+                      : ''}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+    </div>
+  );
+}
