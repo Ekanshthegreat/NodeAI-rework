@@ -166,3 +166,5 @@ remains loopback-only. Ordinary ROS mode requires a loopback listener.
 - [Jazzy rclpy action client](https://github.com/ros2/rclpy/blob/jazzy/rclpy/rclpy/action/client.py)
 - [Jazzy AMCL publisher/QoS](https://github.com/ros-navigation/navigation2/blob/jazzy/nav2_amcl/src/amcl_node.cpp)
 - [BatteryState message](https://github.com/ros2/common_interfaces/blob/jazzy/sensor_msgs/msg/BatteryState.msg)
+
+![ROS navigation page connected to the action test fixture](images/ros-control.png)

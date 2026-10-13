@@ -9,30 +9,38 @@ export default function LoginPage() {
         <span>Fleet orchestration</span>
       </div>
       <div className="landing-body">
-        <p className="eyebrow">A working local simulation</p>
+        <p className="eyebrow">ROS 2 navigation and a local test workspace</p>
         <h1>
-          Give the fleet a mission.
+          Coordinate the fleet.
           <br />
-          See every decision.
+          Inspect every outcome.
         </h1>
         <p className="lead">
-          Plan a route, dispatch a robot and observe its progress. Inject a fault to test recovery,
-          then replay the recorded run.
+          Connect ROS 2 robots, send Nav2 goals and inspect action results. Use the local simulator
+          to explore mission execution, recovery and recorded replay without hardware.
         </p>
-        <Link className="primary-button" to="/app">
-          Open mission control <ArrowRight size={18} />
+        <Link className="primary-button" to="/app/ros">
+          Open ROS mission control <ArrowRight size={18} />
+        </Link>
+        <Link className="secondary-button" to="/app">
+          Try the local simulation
         </Link>
         <p className="landing-note">
-          No account, credentials or robot hardware required. Your runs stay in this browser.
+          ROS mode needs a running bridge and Nav2 stack. The local simulator requires no account or
+          hardware.
         </p>
         <div className="landing-features">
           {[
-            [MapPin, 'Plan', 'Typed commands and obstacle-aware grid routing.'],
-            [Activity, 'Execute', 'Fixed-step robot motion, telemetry and mission events.'],
+            [MapPin, 'ROS telemetry', 'Namespace-specific localization and battery subscriptions.'],
+            [
+              Activity,
+              'Nav2 actions',
+              'Explicit goal acceptance, feedback, cancellation and terminal results.',
+            ],
             [
               RotateCcw,
-              'Recover & replay',
-              'Bounded reassignment, saved runs and playback controls.',
+              'Local experiments',
+              'Simulated task execution, bounded recovery and recorded replay.',
             ],
           ].map(([Icon, title, description]) => {
             const Component = Icon as typeof MapPin;
@@ -46,8 +54,9 @@ export default function LoginPage() {
           })}
         </div>
         <p className="scope-note">
-          This is a fleet-simulation MVP. Vendor transport adapters are experimental; the demo does
-          not control physical robots.
+          ROS mode covers navigation goals. Compound robot tasks and automatic reassignment
+          currently belong to the local simulator. The ROS test fixture uses synthetic telemetry and
+          no hardware.
         </p>
       </div>
     </main>

@@ -7,7 +7,7 @@ fleet simulator. Version 0.2.0 adds a Jazzy package for real Nav2 actions,
 localization and battery telemetry. The local simulator remains available without
 an account, database or robot hardware.
 
-![Mission control](docs/images/mission-control.png)
+![ROS control page with a labelled action-test fixture](docs/images/ros-control.png)
 
 ## Run it
 
