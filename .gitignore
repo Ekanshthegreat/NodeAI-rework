@@ -28,3 +28,10 @@ dist-ssr
 *.tsbuildinfo
 # Vite configuration cache
 vite.config.ts.timestamp-*.mjs
+# Python and ROS build artifacts
+__pycache__/
+*.pyc
+.venv*/
+ros2/build/
+ros2/install/
+ros2/log/
