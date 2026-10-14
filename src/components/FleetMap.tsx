@@ -34,8 +34,8 @@ export default function FleetMap({
       role="img"
       aria-label="Fleet map with robot positions, named locations, planned routes and restricted areas"
     >
-      <rect width="680" height="480" fill="#fafbfc" />
-      <g stroke="#e6e9ee" strokeWidth="1">
+      <rect width="680" height="480" fill="#fcfcfa" />
+      <g stroke="#e5e7df" strokeWidth="1">
         {Array.from({ length: 11 }, (_, i) => (
           <g key={i}>
             <path d={`M${x(-10 + i * 2)},40V440`} />
@@ -43,7 +43,7 @@ export default function FleetMap({
           </g>
         ))}
       </g>
-      <rect x="40" y="40" width="600" height="400" fill="none" stroke="#cbd3df" />
+      <rect x="40" y="40" width="600" height="400" fill="none" stroke="#d1d5ca" />
       {site.obstacles?.map((o) => (
         <rect
           key={o.id}
@@ -51,16 +51,16 @@ export default function FleetMap({
           y={y(o.rect.y + o.rect.h)}
           width={o.rect.w * 30}
           height={o.rect.h * 20}
-          fill="#cbd3df"
-          stroke="#8793a4"
+          fill="#d1d5ca"
+          stroke="#929a8b"
         />
       ))}
       {site.noGo?.map((z) => (
         <polygon
           key={z.id}
           points={z.poly.map((p) => `${x(p.x)},${y(p.y)}`).join(' ')}
-          fill="#edf0f4"
-          stroke="#8793a4"
+          fill="#eff0e9"
+          stroke="#929a8b"
           strokeDasharray="4 3"
         />
       ))}
@@ -71,7 +71,7 @@ export default function FleetMap({
             key={m.id}
             points={m.route.map((p) => `${x(p.x)},${y(p.y)}`).join(' ')}
             fill="none"
-            stroke="#647da5"
+            stroke="#6d805a"
             strokeWidth="2"
             strokeDasharray="5 4"
           />
@@ -80,8 +80,8 @@ export default function FleetMap({
         const p = HOSPITAL_ANCHORS[name];
         return (
           <g key={name}>
-            <circle cx={x(p.x)} cy={y(p.y)} r="3" fill="#798599" />
-            <text x={x(p.x) + 7} y={y(p.y) - 8} fill="#617083" fontSize="11">
+            <circle cx={x(p.x)} cy={y(p.y)} r="3" fill="#7a8176" />
+            <text x={x(p.x) + 7} y={y(p.y) - 8} fill="#626b64" fontSize="11">
               {name}
             </text>
           </g>
@@ -103,7 +103,7 @@ export default function FleetMap({
             fill={
               r.status === 'BLOCKED' || r.status === 'ERROR' || r.status === 'CHARGING'
                 ? '#8a5e42'
-                : '#245b91'
+                : '#4d6148'
             }
             stroke="white"
             strokeWidth="3"
@@ -119,13 +119,13 @@ export default function FleetMap({
             textAnchor="middle"
             fontSize="11"
             fontWeight="600"
-            fill="#172033"
+            fill="#252a28"
           >
             {r.id}
           </text>
         </g>
       ))}
-      <text x="40" y="466" fontSize="11" fill="#788597">
+      <text x="40" y="466" fontSize="11" fill="#7a8176">
         World coordinates in metres · Solid blocks: obstacles · Dashed area: no-go zone
       </text>
     </svg>

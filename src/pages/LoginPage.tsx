@@ -1,72 +1,81 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bot, MapPin, Activity, RotateCcw } from 'lucide-react';
+import FleetMap from '../components/FleetMap';
+import { createDemoState } from '../simulation/engine';
+
+const reference = createDemoState(0);
+
 export default function LoginPage() {
-  const hostedDemo = import.meta.env.VITE_ROUTER === 'hash';
   return (
     <main className="landing">
-      <div className="landing-brand">
-        <Bot size={28} />
+      <header className="landing-brand">
         <strong>NodeAI</strong>
-        <span>Fleet orchestration</span>
-      </div>
+        <span>Robot mission workspace</span>
+        <a href="https://github.com/Ekanshthegreat/NodeAI-rework">GitHub ↗</a>
+      </header>
       <div className="landing-body">
-        <p className="eyebrow">ROS 2 navigation and a local test workspace</p>
-        <h1>
-          Coordinate the fleet.
-          <br />
-          Inspect every outcome.
-        </h1>
-        <p className="lead">
-          Connect ROS 2 robots, send Nav2 goals and inspect action results. Use the local simulator
-          to explore mission execution, recovery and recorded replay without hardware.
-        </p>
-        <Link className="primary-button" to={hostedDemo ? '/app' : '/app/ros'}>
-          {hostedDemo ? 'Try the local simulation' : 'Open ROS mission control'}{' '}
-          <ArrowRight size={18} />
-        </Link>
-        <Link className="secondary-button" to={hostedDemo ? '/app/ros' : '/app'}>
-          {hostedDemo ? 'Open ROS mission control' : 'Try the local simulation'}
-        </Link>
-        <p className="landing-note">
-          ROS mode needs a running bridge and Nav2 stack. The local simulator requires no account or
-          hardware.
-        </p>
-        <div className="landing-features">
-          {[
-            [MapPin, 'ROS telemetry', 'Namespace-specific localization and battery subscriptions.'],
-            [
-              Activity,
-              'Nav2 actions',
-              'Explicit goal acceptance, feedback, cancellation and terminal results.',
-            ],
-            [
-              RotateCcw,
-              'Local experiments',
-              'Simulated task execution, bounded recovery and recorded replay.',
-            ],
-          ].map(([Icon, title, description]) => {
-            const Component = Icon as typeof MapPin;
-            return (
-              <section key={String(title)}>
-                <Component size={22} />
-                <h2>{String(title)}</h2>
-                <p>{String(description)}</p>
-              </section>
-            );
-          })}
+        <div className="landing-intro">
+          <p className="eyebrow">Navigation / execution / replay</p>
+          <h1>Simulation and ROS navigation</h1>
+          <p className="lead">
+            A local fleet simulator and a ROS 2 navigation bridge. Choose a workspace to inspect
+            routes, send missions and follow execution.
+          </p>
         </div>
-        <p className="landing-note">
-          <a href="https://github.com/Ekanshthegreat/NodeAI-rework">Source and architecture</a>
-          {' · '}
-          <a href="https://github.com/Ekanshthegreat/NodeAI-rework/blob/main/docs/DEMO.md">
-            Guided demo scenarios
-          </a>
-        </p>
-        <p className="scope-note">
-          ROS mode covers navigation goals. Compound robot tasks and automatic reassignment
-          currently belong to the local simulator. The ROS test fixture uses synthetic telemetry and
-          no hardware.
-        </p>
+        <div className="workspace-picker">
+          <div className="workspace-options">
+            <Link to="/app" className="workspace-option">
+              <span className="option-number">01</span>
+              <div>
+                <h2>
+                  Local fleet <span aria-hidden="true">→</span>
+                </h2>
+                <p>Three robots on a static site. Dispatch, inject a fault, then replay the run.</p>
+                <small>Runs in this browser · no setup</small>
+              </div>
+            </Link>
+            <Link to="/app/ros" className="workspace-option">
+              <span className="option-number">02</span>
+              <div>
+                <h2>
+                  ROS 2 bridge <span aria-hidden="true">→</span>
+                </h2>
+                <p>Send Nav2 poses or waypoint routes. Inspect telemetry and action results.</p>
+                <small>Requires a running Jazzy bridge and Nav2 server</small>
+              </div>
+            </Link>
+            <div className="session-recipe">
+              <h2>A first simulation run</h2>
+              <code>Deliver supplies from Pharmacy to Ward A</code>
+              <p>
+                Dispatch this command, block the assigned robot, and watch the replacement finish.
+                Open Replay to inspect the recorded positions and events.
+              </p>
+            </div>
+          </div>
+          <figure className="reference-map">
+            <figcaption>
+              Hospital Alpha <span>Reference layout · metres</span>
+            </figcaption>
+            <FleetMap site={reference.site} robots={reference.robots} />
+          </figure>
+        </div>
+        <footer className="project-footer">
+          <div>
+            <a href="https://github.com/Ekanshthegreat/NodeAI-rework/blob/main/docs/DEMO.md">
+              Demo guide
+            </a>
+            <a href="https://github.com/Ekanshthegreat/NodeAI-rework/blob/main/docs/ARCHITECTURE.md">
+              Architecture
+            </a>
+            <a href="https://github.com/Ekanshthegreat/NodeAI-rework/blob/main/docs/ROS2.md">
+              ROS setup
+            </a>
+          </div>
+          <p>
+            Local robots are point agents. Hardware task handlers and fleet collision avoidance are
+            outside this release.
+          </p>
+        </footer>
       </div>
     </main>
   );

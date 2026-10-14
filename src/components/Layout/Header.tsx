@@ -1,5 +1,5 @@
 import { NavLink, Link } from 'react-router-dom';
-import { Bot, Pause, Play } from 'lucide-react';
+import { Pause, Play } from 'lucide-react';
 import { useFleetStore } from '../../store/useFleetStore';
 export default function Header() {
   const running = useFleetStore((s) => s.fleet.running),
@@ -7,7 +7,6 @@ export default function Header() {
   return (
     <header className="app-header">
       <Link to="/" className="brand">
-        <Bot size={25} />
         <strong>NodeAI</strong>
       </Link>
       <span className="mode-badge">Local simulation</span>

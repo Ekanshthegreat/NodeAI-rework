@@ -2,8 +2,7 @@
 
 [![Validate MVP](https://github.com/Ekanshthegreat/NodeAI-rework/actions/workflows/ci.yml/badge.svg)](https://github.com/Ekanshthegreat/NodeAI-rework/actions/workflows/ci.yml)
 
-**Typed robot missions, bounded recovery and recorded playback—with a separate
-ROS 2 bridge for real Nav2 actions.**
+Robot mission simulation and a ROS 2 Jazzy bridge for Nav2 navigation.
 
 [Try the browser demo](https://ekanshthegreat.github.io/NodeAI-rework/) ·
 [Architecture](docs/ARCHITECTURE.md) · [ROS deployment](docs/ROS2.md) ·
@@ -27,7 +26,7 @@ clients. The browser simulator runs without hardware, accounts or a backend.
 The live Pages demo runs the local simulator. ROS control needs a separately
 running bridge; its validated test fixture is not a physical robot deployment.
 
-## Architecture at a glance
+## Execution paths
 
 ```mermaid
 flowchart TB
@@ -81,7 +80,7 @@ Recovery can fail: no eligible replacement, an unreachable route or an exhausted
 retry budget produces a visible terminal failure. The simulator's cargo handoff
 is a modeled operation, not a robot protocol.
 
-## Engineering decisions
+## Design choices
 
 | Decision | Why it matters | Evidence |
 | --- | --- | --- |

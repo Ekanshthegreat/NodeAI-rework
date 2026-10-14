@@ -1,7 +1,7 @@
 import { Component, useState, lazy, Suspense, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Dialog } from '@headlessui/react';
-import { Play, Pause, Square, Plus, AlertTriangle, RotateCcw } from 'lucide-react';
+import { Play, Pause, Square, Plus, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useFleetStore } from '../store/useFleetStore';
 import FleetMap from '../components/FleetMap';
@@ -49,7 +49,7 @@ export default function DashboardPage() {
         <div>
           <p className="eyebrow">{fleet.site.name}</p>
           <h1>Mission control</h1>
-          <p>Plan, execute and inspect the fleet’s behavior.</p>
+          <p>Local simulation · static site · recorded execution</p>
         </div>
         <button className="quiet-button" onClick={() => setResetOpen(true)}>
           <RotateCcw size={15} /> Reset demo
@@ -133,10 +133,10 @@ export default function DashboardPage() {
               value={command}
               onChange={(e) => setCommand(e.target.value)}
               maxLength={300}
-              rows={3}
+              rows={2}
             />
             <p className="field-help">
-              Commands use a small, explicit grammar. Location names must match the map.
+              Use the named locations on the map. Commands follow the examples below.
             </p>
             <button type="submit" className="primary-button">
               <Plus size={16} /> Dispatch mission
@@ -148,7 +148,7 @@ export default function DashboardPage() {
             </p>
           )}
           <div className="examples">
-            <span>Try an example</span>
+            <span>Command examples</span>
             {[example, 'Inspect Ward B', 'Go to Loading Dock then Charge'].map((t) => (
               <button key={t} onClick={() => setCommand(t)}>
                 {t}
@@ -164,8 +164,8 @@ export default function DashboardPage() {
             Automatic fault recovery
           </label>
           <p className="field-help">
-            Blocked threshold: 3 simulated seconds. One reassignment per mission; unavailable
-            replacements produce a visible failure.
+            One replacement attempt after 3 blocked simulation seconds. No eligible replacement ends
+            the mission.
           </p>
         </section>
       </div>
@@ -173,43 +173,59 @@ export default function DashboardPage() {
         <section className="panel">
           <h2>Robots</h2>
           <p className="field-help">
-            Clear fault simulates an operator returning the robot to service; low-battery recovery
-            includes a replacement battery.
+            Faults are simulated. Clear fault returns a robot to service and restores a low battery.
           </p>
-          <div className="robot-list">
-            {fleet.robots.map((r) => (
-              <article className="robot-card" key={r.id}>
-                <div className="robot-title">
-                  <strong>{r.id}</strong>
-                  <span className="status">{r.status}</span>
-                </div>
-                <p>
-                  Battery {Math.round(r.battery * 100)}% · Position {r.pose.x.toFixed(1)},{' '}
-                  {r.pose.y.toFixed(1)}
-                </p>
-                <div className="robot-actions">
-                  <button
-                    className="quiet-button"
-                    onClick={() => store.fault(r.id, 'BLOCKED')}
-                    disabled={Boolean(fleet.faults[r.id])}
-                  >
-                    <AlertTriangle size={14} /> Block
-                  </button>
-                  <button
-                    className="quiet-button"
-                    onClick={() => store.fault(r.id, 'LOW_BATTERY')}
-                    disabled={Boolean(fleet.faults[r.id])}
-                  >
-                    Low battery
-                  </button>
-                  {(fleet.faults[r.id] || r.status === 'ERROR' || r.battery < 0.2) && (
-                    <button className="quiet-button" onClick={() => store.clearFault(r.id)}>
-                      Clear fault
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))}
+          <div className="fleet-table-wrap">
+            <table className="fleet-table">
+              <thead>
+                <tr>
+                  <th>Robot</th>
+                  <th>State</th>
+                  <th>Battery</th>
+                  <th>Position (m)</th>
+                  <th>Fault injection</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fleet.robots.map((r) => (
+                  <tr key={r.id}>
+                    <th scope="row">{r.id}</th>
+                    <td>
+                      <span className="status">{r.status}</span>
+                    </td>
+                    <td>{Math.round(r.battery * 100)}%</td>
+                    <td>
+                      {r.pose.x.toFixed(1)}, {r.pose.y.toFixed(1)}
+                    </td>
+                    <td>
+                      <div className="robot-actions">
+                        <button
+                          className="quiet-button"
+                          aria-label={`Block ${r.id}`}
+                          onClick={() => store.fault(r.id, 'BLOCKED')}
+                          disabled={Boolean(fleet.faults[r.id])}
+                        >
+                          Block
+                        </button>
+                        <button
+                          className="quiet-button"
+                          aria-label={`Low battery ${r.id}`}
+                          onClick={() => store.fault(r.id, 'LOW_BATTERY')}
+                          disabled={Boolean(fleet.faults[r.id])}
+                        >
+                          Low battery
+                        </button>
+                        {(fleet.faults[r.id] || r.status === 'ERROR' || r.battery < 0.2) && (
+                          <button className="quiet-button" onClick={() => store.clearFault(r.id)}>
+                            Clear fault
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
         <section className="panel">
@@ -220,7 +236,7 @@ export default function DashboardPage() {
             </Link>
           </div>
           {fleet.missions.length === 0 ? (
-            <p className="empty-state">Dispatch your first mission to start a recorded run.</p>
+            <p className="empty-state">No missions. Dispatch a command to begin recording.</p>
           ) : (
             <div className="mission-list">
               {fleet.missions
@@ -264,7 +280,7 @@ export default function DashboardPage() {
       </div>
       <section className="panel event-panel">
         <h2>Event log</h2>
-        <p className="field-help">Mission and recovery events, ordered by simulation time.</p>
+        <p className="field-help">Newest first · simulation timestamps</p>
         {fleet.events.length === 0 ? (
           <p className="empty-state">No events yet.</p>
         ) : (
