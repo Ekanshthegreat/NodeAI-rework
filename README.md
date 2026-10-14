@@ -69,7 +69,7 @@ sequenceDiagram
   Engine->>First: Travel, pick up, deliver
   Operator->>Engine: Inject blocked fault after pickup
   Engine->>Recorder: Record fault and stopped position
-  Note over Engine: Wait 3 simulated seconds; one recovery attempt
+  Note over Engine: Wait 3 simulated seconds, one recovery attempt
   Engine->>Second: Route to stopped robot
   Second->>First: Simulated cargo handoff
   Engine->>Second: Continue delivery to Ward A
