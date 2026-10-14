@@ -1,6 +1,6 @@
 # ROS 2 / Nav2 integration
 
-The v0.2.0 ROS path sends real `nav2_msgs/action/NavigateToPose` goals, subscribes
+The v0.3.0 ROS path sends real `nav2_msgs/action/NavigateToPose` goals, subscribes
 to localization and battery messages, and reports actual action feedback/results.
 It does not execute the local simulator's pickup, handoff, charging or recovery
 steps on a physical robot. Those need separate robot-specific handlers.
@@ -86,7 +86,8 @@ using a different port. The standard configuration accepts local ports 5173 and
 
 ## Goal lifecycle
 
-One outstanding goal is permitted per robot. A request ID identifies its exact
+One outstanding mission is permitted per robot. A mission is one pose or a
+sequence of 1–20 waypoints, executed through one NavigateToPose action at a time. A request ID identifies its exact
 payload, so repeating an unchanged retained request reports its current state
 without dispatching a second goal. Reusing an ID with different content is
 rejected. Terminal history and cancel-request history are bounded to 256 entries;
@@ -100,7 +101,7 @@ acknowledgement is not completion either: the robot remains occupied until its
 terminal result arrives.
 
 A goal-response timeout holds the assignment. If Nav2 later accepts that goal,
-the bridge cancels it rather than resubmitting it. Execution timeout requests
+the bridge cancels it rather than resubmitting it. Each leg has its own execution timeout, requesting
 cancellation at 120 seconds. Failed cancellation or missing results leave the
 state unknown and the assignment held. No automatic reassignment or manual
 "force idle" button is exposed in ROS mode.
@@ -109,7 +110,23 @@ Disconnecting/reloading the browser does not cancel a robot goal. Reconnect
 heartbeats expose its current request so it can be explicitly cancelled. Bridge
 restart loses in-memory history and cannot recover an earlier action handle;
 reconcile or stop existing Nav2 goals before issuing commands after a restart.
-A full restart-reconciliation protocol and robot task sequencing are next steps.
+Restart reconciliation and robot-specific non-navigation tasks remain future work.
+
+## Waypoint lifecycle
+
+The complete route is validated before the first action is sent. The robot stays
+assigned across all legs. Each subsequent dispatch rechecks localization,
+battery and action-server readiness. A later rejection or readiness failure
+ends the mission as failed; no later waypoint is sent. Old feedback and result
+callbacks are guarded by a per-leg generation, so they cannot change the next
+leg's state. No automatic retry or robot reassignment is attempted.
+
+Cancellation targets the parent mission ID and requests cancellation of its
+current action. If that leg succeeds while cancellation is in flight, its
+completion is counted but remaining legs are skipped. If the final leg already
+succeeded, the mission remains succeeded. Unknown results keep the assignment
+held. Navigation events and robot heartbeats report `completed_waypoints` and
+`total_waypoints`; success requires completion of the entire route.
 
 ## Wire contract (version 1)
 
@@ -120,6 +137,14 @@ A full restart-reconciliation protocol and robot task sequencing are next steps.
 ```json
 {"version":1,"type":"cancel","request_id":"another-uuid","robot_id":"agv1","target_request_id":"a-new-uuid"}
 ```
+
+```json
+{"version":1,"type":"waypoints","request_id":"route-uuid","robot_id":"agv1","targets":[{"x":1.0,"y":2.0,"yaw":0.0},{"x":3.0,"y":4.0,"yaw":0.0}]}
+```
+
+The `hello` message advertises `capabilities: ["navigate", "waypoints", "cancel"]`.
+The browser enables the route editor only when the bridge advertises waypoint
+support. Older version-1 bridges can still handle single-pose commands.
 
 Targets are metres and radians in the configured frame: finite X/Y values within
 ±10,000 and yaw within ±π. The server rejects unknown fields, robots, invalid
@@ -136,10 +161,10 @@ docker run --rm nodeai-ros-test
 ```
 
 The official ROS Jazzy image builds the package with `colcon`. The suite contains
-15 pure lifecycle tests and four integration tests using real rclpy action
+23 pure lifecycle tests and seven integration tests using real rclpy action
 clients/servers, Nav2 messages and the WebSocket transport. It checks frame/goal
 construction, telemetry, feedback, success, rejection, cancellation and denied
-browser origins. These tests use a fixture action server; they are not a full
+browser origins, sequential route completion, later rejection and cancellation. These tests use a fixture action server; they are not a full
 Nav2 navigation-stack, Gazebo, hardware or collision-avoidance validation.
 
 ## Browser demonstration fixture
@@ -167,4 +192,4 @@ remains loopback-only. Ordinary ROS mode requires a loopback listener.
 - [Jazzy AMCL publisher/QoS](https://github.com/ros-navigation/navigation2/blob/jazzy/nav2_amcl/src/amcl_node.cpp)
 - [BatteryState message](https://github.com/ros2/common_interfaces/blob/jazzy/sensor_msgs/msg/BatteryState.msg)
 
-![ROS navigation page connected to the action test fixture](images/ros-control.png)
+![ROS navigation page connected to the action test fixture](images/ros-waypoints.png)

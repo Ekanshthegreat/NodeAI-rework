@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name="nodeai_bridge",
-    version="0.2.0",
+    version="0.3.0",
     packages=["nodeai_bridge"],
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/nodeai_bridge"]),

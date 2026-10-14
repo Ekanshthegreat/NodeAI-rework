@@ -3,11 +3,11 @@
 [![Validate MVP](https://github.com/Ekanshthegreat/NodeAI-rework/actions/workflows/ci.yml/badge.svg)](https://github.com/Ekanshthegreat/NodeAI-rework/actions/workflows/ci.yml)
 
 A ROS 2 navigation workspace with a browser control page and a separate local
-fleet simulator. Version 0.2.0 adds a Jazzy package for real Nav2 actions,
-localization and battery telemetry. The local simulator remains available without
+fleet simulator. Version 0.3.0 adds bounded waypoint missions to the Jazzy
+bridge, with real Nav2 actions, localization and battery telemetry. The local simulator remains available without
 an account, database or robot hardware.
 
-![ROS control page with a labelled action-test fixture](docs/images/ros-control.png)
+![ROS control page with a labelled action-test fixture](docs/images/ros-waypoints.png)
 
 ## Run it
 
@@ -31,7 +31,7 @@ cancellation handling, telemetry subscriptions and actual ROS action tests.
 See [ROS deployment and protocol](docs/ROS2.md) for setup and the container test
 fixture. The browser does not use simulated robot movement in this mode.
 
-ROS integration currently covers navigation goals. Robot-specific pickup,
+ROS integration currently covers single-pose and sequential waypoint navigation. Robot-specific pickup,
 delivery, docking/charging handlers and restart reconciliation remain future
 work. The local simulator's compound tasks and automatic recovery are not sent
 to hardware. Real ROS interfaces were tested against a fixture action server,
@@ -100,10 +100,10 @@ npm run test:run
 npm run build
 ```
 
-The browser/simulation release has 55 automated tests covering coordinate transforms, command and
+The browser/simulation release has 56 automated tests covering coordinate transforms, command and
 route validation, mission execution, recovery budgets, cargo handoff, persistence
 and replay lookup. CI installs from the lockfile and runs these checks, plus a separate Jazzy
-container job with 19 ROS lifecycle/integration tests. The MVP
+container job with 30 ROS lifecycle/integration tests. The MVP
 was also exercised in the browser on desktop and at a 390-pixel mobile width.
 
 ## Simulation boundaries

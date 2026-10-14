@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 — 2026-10-14
+
+- Sequential waypoint missions with 1–20 validated poses and one assignment per robot.
+- Per-leg readiness checks, deadlines and callback guards; cancellation stops the route.
+- Browser route editor, capability negotiation and completed-waypoint progress.
+- Real ROS action tests for sequence completion, later rejection and cancellation.
+- 56 browser/simulation tests and 30 ROS lifecycle/integration checks.
+
 ## 0.2.0 — 2026-10-13
 
 - ROS 2 Jazzy bridge package, launch file and per-robot topic/action configuration.

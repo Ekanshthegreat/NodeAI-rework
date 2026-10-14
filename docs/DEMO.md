@@ -55,3 +55,14 @@ mobile mission/replay layouts were also checked. Automated behavior checks are
 in the `*.test.ts` files and run through the CI workflow.
 
 ![Recorded delivery at completion](images/replay.png)
+
+## ROS waypoint acceptance check
+
+Start the labelled action fixture using [ROS setup](ROS2.md), connect the ROS
+page, select **Waypoint route**, and send the two default positive-X waypoints.
+The event log should progress from 0/2 to 1/2 and then succeed at 2/2. The same
+robot remains assigned between legs. Cancel a new route while running: its
+terminal event should be cancelled and no remaining leg should start. Set the
+second waypoint's X to −1 to exercise a later rejection: the mission fails after
+one completed waypoint. The fixture is a ROS action transport test, not a
+physical robot or a full Nav2 planner.
