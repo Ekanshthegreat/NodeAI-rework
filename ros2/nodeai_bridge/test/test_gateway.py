@@ -211,6 +211,122 @@ class GatewayTests(unittest.TestCase):
         self.port.sent[0][1]({"distance_remaining": 9})
         self.assertEqual(self.gateway.sessions["first"].state, "succeeded")
 
+    def waypoints(self):
+        return {
+            "version": 1,
+            "type": "waypoints",
+            "robot_id": "agv1",
+            "request_id": "route",
+            "targets": [{"x": 1, "y": 2, "yaw": 0}, {"x": 3, "y": 4, "yaw": 0}],
+        }
+
+    def test_waypoints_dispatch_serially_and_hold_robot_until_last_result(self):
+        self.gateway.receive(self.waypoints())
+        self.assertEqual(len(self.port.sent), 1)
+        first = Handle()
+        self.port.sent[0][2].set_result(first)
+        self.complete(first)
+        self.assertEqual(len(self.port.sent), 2)
+        self.assertEqual(self.port.sent[1][0]["x"], 3)
+        self.assertIn("agv1", self.gateway.active)
+        self.assertEqual(self.events[-1]["completed_waypoints"], 1)
+        second = Handle()
+        self.port.sent[1][2].set_result(second)
+        self.complete(second)
+        self.assertEqual(self.events[-1]["state"], "succeeded")
+        self.assertEqual(self.events[-1]["completed_waypoints"], 2)
+        self.assertFalse(self.gateway.active)
+
+    def test_stale_feedback_cannot_change_next_leg(self):
+        self.gateway.receive(self.waypoints())
+        first = Handle()
+        self.port.sent[0][2].set_result(first)
+        self.complete(first)
+        before = len(self.events)
+        self.port.sent[0][1]({"distance_remaining": 10})
+        self.assertEqual(len(self.events), before)
+        self.assertEqual(self.gateway.sessions["route"].state, "pending")
+
+    def test_cancelled_route_does_not_dispatch_remaining_waypoints(self):
+        self.gateway.receive(self.waypoints())
+        first = Handle()
+        self.port.sent[0][2].set_result(first)
+        self.gateway.receive(
+            {
+                "version": 1,
+                "type": "cancel",
+                "robot_id": "agv1",
+                "request_id": "stop",
+                "target_request_id": "route",
+            }
+        )
+        self.complete(first, 5)
+        self.assertEqual(len(self.port.sent), 1)
+        self.assertEqual(self.events[-1]["state"], "cancelled")
+
+    def test_cancel_racing_intermediate_success_skips_next_leg(self):
+        self.gateway.receive(self.waypoints())
+        first = Handle()
+        self.port.sent[0][2].set_result(first)
+        self.gateway.receive(
+            {
+                "version": 1,
+                "type": "cancel",
+                "robot_id": "agv1",
+                "request_id": "stop",
+                "target_request_id": "route",
+            }
+        )
+        self.complete(first)
+        self.assertEqual(len(self.port.sent), 1)
+        self.assertEqual(self.events[-1]["state"], "cancelled")
+        self.assertEqual(self.events[-1]["completed_waypoints"], 1)
+        first.cancel.set_result(SimpleNamespace(goals_canceling=[]))
+        self.assertEqual(self.gateway.sessions["route"].state, "cancelled")
+
+    def test_final_success_is_not_relabelled_by_late_cancel_ack(self):
+        first = Handle()
+        self.send().set_result(first)
+        self.gateway.receive(
+            {
+                "version": 1,
+                "type": "cancel",
+                "robot_id": "agv1",
+                "request_id": "stop",
+                "target_request_id": "first",
+            }
+        )
+        self.complete(first)
+        first.cancel.set_result(SimpleNamespace(goals_canceling=[]))
+        self.assertEqual(self.events[-1]["state"], "succeeded")
+
+    def test_intermediate_rejection_fails_the_parent_mission(self):
+        self.gateway.receive(self.waypoints())
+        first = Handle()
+        self.port.sent[0][2].set_result(first)
+        self.complete(first)
+        self.port.sent[1][2].set_result(Handle(False))
+        self.assertEqual(self.events[-1]["state"], "failed")
+        self.assertEqual(self.events[-1]["completed_waypoints"], 1)
+
+    def test_next_leg_rechecks_readiness(self):
+        self.gateway.receive(self.waypoints())
+        first = Handle()
+        self.port.sent[0][2].set_result(first)
+        self.port.available = False
+        self.complete(first)
+        self.assertEqual(len(self.port.sent), 1)
+        self.assertEqual(self.events[-1]["state"], "failed")
+
+    def test_waypoint_limits_and_all_targets_validate_before_dispatch(self):
+        for targets in [
+            [],
+            [self.request["target"]] * 21,
+            [self.request["target"], {"x": math.nan, "y": 0, "yaw": 0}],
+        ]:
+            self.gateway.receive({**self.waypoints(), "targets": targets})
+        self.assertEqual(len(self.port.sent), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

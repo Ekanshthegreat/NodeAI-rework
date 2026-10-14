@@ -181,6 +181,10 @@ class BridgeNode(Node):
                     "ready": port.ready(),
                     "request_id": request_id,
                     "state": session.state if session else "idle",
+                    "completed_waypoints": session.completed if session else 0,
+                    "total_waypoints": len(self.gateway.targets(session))
+                    if session
+                    else 0,
                 }
             )
         self.emit({"version": 1, "type": "robots", "robots": robots})

@@ -14,38 +14,51 @@ def identifier(value):
     return value
 
 
+def validate_target(target):
+    if not isinstance(target, dict) or set(target) != {"x", "y", "yaw"}:
+        raise ValueError("Target needs x, y and yaw")
+    for key, limit in [("x", 10000), ("y", 10000), ("yaw", math.pi)]:
+        value = target[key]
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or abs(value) > limit
+        ):
+            raise ValueError(f"Invalid target {key}")
+
+
 def command(data):
-    if not isinstance(data, dict) or (
-        type(data.get("version")) is not int or data.get("version") != 1
+    if (
+        not isinstance(data, dict)
+        or type(data.get("version")) is not int
+        or data.get("version") != 1
     ):
         raise ValueError("Expected protocol version 1")
     kind = data.get("type")
     fields = {"version", "type", "request_id", "robot_id"}
-    if kind == "navigate":
-        fields.add("target")
-    elif kind == "cancel":
-        fields.add("target_request_id")
-    else:
-        raise ValueError("Supported commands are navigate and cancel")
+    extra = {
+        "navigate": "target",
+        "waypoints": "targets",
+        "cancel": "target_request_id",
+    }
+    if kind not in extra:
+        raise ValueError("Supported commands are navigate, waypoints and cancel")
+    fields.add(extra[kind])
     if set(data) != fields:
         raise ValueError("Unexpected or missing command fields")
     identifier(data["request_id"])
     identifier(data["robot_id"])
     if kind == "cancel":
         identifier(data["target_request_id"])
+    elif kind == "navigate":
+        validate_target(data["target"])
     else:
-        target = data["target"]
-        if not isinstance(target, dict) or set(target) != {"x", "y", "yaw"}:
-            raise ValueError("Target needs x, y and yaw")
-        for key, limit in [("x", 10000), ("y", 10000), ("yaw", math.pi)]:
-            value = target[key]
-            if (
-                isinstance(value, bool)
-                or not isinstance(value, (int, float))
-                or not math.isfinite(value)
-                or abs(value) > limit
-            ):
-                raise ValueError(f"Invalid target {key}")
+        targets = data["targets"]
+        if not isinstance(targets, list) or not 1 <= len(targets) <= 20:
+            raise ValueError("A waypoint mission needs 1–20 targets")
+        for target in targets:
+            validate_target(target)
     return data
 
 
@@ -59,6 +72,8 @@ class Session:
     cancel_sent: bool = False
     cancel_started: float | None = None
     error: str | None = None
+    completed: int = 0
+    generation: int = 0
 
 
 class Gateway:
@@ -85,6 +100,8 @@ class Gateway:
                 "robot_id": session.request["robot_id"],
                 "state": session.state,
                 "error": session.error,
+                "completed_waypoints": session.completed,
+                "total_waypoints": len(self.targets(session)),
                 **extra,
             }
         )
@@ -152,18 +169,44 @@ class Gateway:
 
             session = Session(copy.deepcopy(data), self.clock())
             self.sessions[request_id], self.active[robot] = session, request_id
-            self.event(session)
-            try:
-                future = self.ports[robot].send(
-                    data["target"], lambda feedback: self.feedback(session, feedback)
-                )
-                future.add_done_callback(lambda done: self.accepted(session, done))
-            except Exception as error:
-                # Delivery is uncertain: keep the robot occupied; never auto-resubmit.
-                session.state, session.error = "unknown", str(error)
-                self.event(session)
+            self.dispatch(session)
         except (ValueError, TypeError, KeyError) as error:
             self.reject(data, str(error))
+
+    def targets(self, session):
+        return session.request.get("targets", [session.request.get("target")])
+
+    def current(self, session, generation):
+        return session.generation == generation and session.state not in TERMINAL
+
+    def dispatch(self, session):
+        session.generation += 1
+        generation = session.generation
+        session.started = self.clock()
+        session.handle = None
+        session.cancel_sent = False
+        session.cancel_started = None
+        session.state, session.error = "pending", None
+        self.event(session)
+        try:
+            future = self.ports[session.request["robot_id"]].send(
+                self.targets(session)[session.completed],
+                lambda feedback: (
+                    self.feedback(session, feedback)
+                    if self.current(session, generation)
+                    else None
+                ),
+            )
+            future.add_done_callback(
+                lambda done: (
+                    self.accepted(session, done)
+                    if self.current(session, generation)
+                    else None
+                )
+            )
+        except Exception as error:
+            session.state, session.error = "unknown", str(error)
+            self.event(session)
 
     def finish(self, session, state, error=None):
         session.state, session.error = state, error
@@ -176,13 +219,23 @@ class Gateway:
         try:
             handle = future.result()
             if not handle.accepted:
-                self.finish(session, "rejected", "Nav2 rejected the goal")
+                self.finish(
+                    session,
+                    "failed" if session.completed else "rejected",
+                    "Nav2 rejected the goal",
+                )
                 return
             session.handle, session.state, session.error = handle, "accepted", None
             self.event(session)
+            generation = session.generation
             handle.get_result_async().add_done_callback(
-                lambda result: self.result(session, result)
+                lambda result: (
+                    self.result(session, result)
+                    if self.current(session, generation)
+                    else None
+                )
             )
+
             if session.cancel_requested:
                 self.cancel(session)
         except Exception as error:
@@ -207,7 +260,22 @@ class Gateway:
             result = future.result()
             status, code = result.status, getattr(result.result, "error_code", 0)
             if status == 4 and code == 0:  # action_msgs/GoalStatus SUCCEEDED
-                self.finish(session, "succeeded")
+                session.completed += 1
+                if session.completed == len(self.targets(session)):
+                    self.finish(session, "succeeded")
+                elif session.cancel_requested:
+                    self.finish(session, "cancelled")
+                else:
+                    self.event(session)
+                    # Recheck server/telemetry readiness before starting another leg.
+                    if not self.ports[session.request["robot_id"]].ready():
+                        self.finish(
+                            session,
+                            "failed",
+                            "Robot is not ready for the next waypoint",
+                        )
+                    else:
+                        self.dispatch(session)
             elif status == 5:
                 self.finish(session, "cancelled")
             else:
@@ -229,9 +297,15 @@ class Gateway:
         session.state = "cancelling"
         self.event(session)
         try:
+            generation = session.generation
             session.handle.cancel_goal_async().add_done_callback(
-                lambda future: self.cancel_response(session, future)
+                lambda future: (
+                    self.cancel_response(session, future)
+                    if self.current(session, generation)
+                    else None
+                )
             )
+
         except Exception as error:
             session.state, session.error = "unknown", str(error)
             self.event(session)
