@@ -712,6 +712,8 @@ p {
 }
 .waypoint-editor fieldset {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-width: 0;
   gap: 8px;
   padding: 14px;
   border: 1px solid #cbd3df;
@@ -720,4 +722,18 @@ p {
 .waypoint-editor legend {
   padding: 0 6px;
   font-weight: 600;
+}
+
+.waypoint-editor input {
+  width: 100%;
+  min-width: 0;
+}
+.waypoint-editor .quiet-button {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+@media (max-width: 760px) {
+  .waypoint-editor fieldset {
+    grid-template-columns: 1fr;
+  }
 }
