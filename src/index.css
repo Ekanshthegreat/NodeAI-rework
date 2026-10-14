@@ -705,3 +705,19 @@ p {
   border-radius: 6px;
   max-width: 100%;
 }
+
+.waypoint-editor {
+  display: grid;
+  gap: 14px;
+}
+.waypoint-editor fieldset {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #cbd3df;
+  border-radius: 6px;
+}
+.waypoint-editor legend {
+  padding: 0 6px;
+  font-weight: 600;
+}

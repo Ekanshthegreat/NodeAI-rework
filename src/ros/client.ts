@@ -8,6 +8,7 @@ export const Target = z
     yaw: finite.min(-Math.PI).max(Math.PI),
   })
   .strict();
+export const WaypointTargets = z.array(Target).min(1).max(20);
 const navigationState = z.enum([
   'pending',
   'accepted',
@@ -28,12 +29,15 @@ const robot = z.object({
   ready: z.boolean(),
   request_id: id.nullable(),
   state: z.union([navigationState, z.literal('idle')]),
+  completed_waypoints: z.number().int().min(0).max(20).optional(),
+  total_waypoints: z.number().int().min(0).max(20).optional(),
 });
 export const BridgeMessage = z.discriminatedUnion('type', [
   z.object({
     version: z.literal(1),
     type: z.literal('hello'),
     mode: z.enum(['ros', 'test_fixture']).optional(),
+    capabilities: z.array(z.enum(['navigate', 'waypoints', 'cancel'])).optional(),
     robots: z.array(id).max(32),
   }),
   z.object({ version: z.literal(1), type: z.literal('robots'), robots: z.array(robot).max(32) }),
@@ -44,6 +48,8 @@ export const BridgeMessage = z.discriminatedUnion('type', [
     robot_id: id,
     state: navigationState,
     error: z.string().nullable(),
+    completed_waypoints: z.number().int().min(0).max(20).optional(),
+    total_waypoints: z.number().int().min(1).max(20).optional(),
     distance_remaining: finite.nonnegative().nullable().optional(),
   }),
   z.object({
@@ -69,6 +75,7 @@ export class BridgeClient {
   private rejectConnection: ((error: Error) => void) | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private handshake = false;
+  private waypointSupport = false;
   constructor(
     private receive: (message: BridgeMessage) => void,
     private connection: (connected: boolean) => void,
@@ -126,6 +133,7 @@ export class BridgeClient {
           const message = BridgeMessage.parse(JSON.parse(event.data));
           if (message.type === 'hello') {
             this.handshake = true;
+            this.waypointSupport = message.capabilities?.includes('waypoints') ?? false;
             this.rejectConnection = null;
             if (this.timer) clearTimeout(this.timer);
             this.timer = null;
@@ -146,6 +154,18 @@ export class BridgeClient {
       request_id: id.parse(requestId),
       robot_id: id.parse(robotId),
       target: Target.parse(target),
+    });
+  }
+  waypoints(robotId: string, targets: z.infer<typeof WaypointTargets>, requestId: string): void {
+    const validated = WaypointTargets.parse(targets);
+    if (!this.waypointSupport)
+      throw new Error('The connected bridge does not support waypoint missions');
+    this.send({
+      version: 1,
+      type: 'waypoints',
+      request_id: id.parse(requestId),
+      robot_id: id.parse(robotId),
+      targets: validated,
     });
   }
   cancel(robotId: string, targetRequestId: string, requestId: string): void {
@@ -170,6 +190,7 @@ export class BridgeClient {
     const socket = this.socket;
     this.socket = null;
     this.handshake = false;
+    this.waypointSupport = false;
     if (socket) {
       socket.onopen = socket.onclose = socket.onerror = socket.onmessage = null;
       socket.close();

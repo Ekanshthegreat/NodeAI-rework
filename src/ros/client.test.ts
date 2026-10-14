@@ -111,4 +111,38 @@ describe('ROS bridge client', () => {
       }).success
     ).toBe(false);
   });
+  it('requires advertised waypoint support and validates the entire route', async () => {
+    const { client, socket } = setup();
+    let connection = client.connect('ws://localhost:8765');
+    socket.message(hello);
+    await connection;
+    expect(() => client.waypoints('agv1', [{ x: 1, y: 2, yaw: 0 }], 'route')).toThrow(
+      'does not support'
+    );
+    client.disconnect();
+    connection = client.connect('ws://localhost:8765');
+    socket.message({ ...hello, capabilities: ['navigate', 'waypoints', 'cancel'] });
+    await connection;
+    expect(() =>
+      client.waypoints(
+        'agv1',
+        [
+          { x: 1, y: 2, yaw: 0 },
+          { x: NaN, y: 2, yaw: 0 },
+        ],
+        'bad'
+      )
+    ).toThrow();
+    expect(socket.sent).toHaveLength(0);
+    client.waypoints(
+      'agv1',
+      [
+        { x: 1, y: 2, yaw: 0 },
+        { x: 3, y: 4, yaw: 0 },
+      ],
+      'route'
+    );
+    expect(JSON.parse(socket.sent[0]).targets).toHaveLength(2);
+    client.disconnect();
+  });
 });

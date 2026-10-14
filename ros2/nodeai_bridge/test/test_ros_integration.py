@@ -246,3 +246,50 @@ def test_paused_simulation_clock_does_not_block_cancellation(bridge):
     )
     wait_for(lambda: state(events, "paused-clock", "cancelled"))
     assert not node.gateway.active
+
+
+def waypoint_request(identifier, xs):
+    return {
+        "version": 1,
+        "type": "waypoints",
+        "request_id": identifier,
+        "robot_id": "agv1",
+        "targets": [{"x": x, "y": 2, "yaw": 0} for x in xs],
+    }
+
+
+def test_real_waypoint_sequence_completes_in_order(bridge):
+    node, events, observed = bridge
+    node.commands.put(waypoint_request("route", [1, 2]))
+    wait_for(lambda: state(events, "route", "succeeded"))
+    assert [pose.pose.position.x for pose in observed] == [1, 2]
+    assert [e for e in events if e.get("request_id") == "route"][-1][
+        "completed_waypoints"
+    ] == 2
+
+
+def test_real_second_waypoint_rejection_fails_mission(bridge):
+    node, events, observed = bridge
+    node.commands.put(waypoint_request("reject-route", [1, -1, 2]))
+    wait_for(lambda: state(events, "reject-route", "failed"))
+    assert [pose.pose.position.x for pose in observed] == [1]
+    assert [e for e in events if e.get("request_id") == "reject-route"][-1][
+        "completed_waypoints"
+    ] == 1
+
+
+def test_real_cancelled_route_does_not_send_next_goal(bridge):
+    node, events, observed = bridge
+    node.commands.put(waypoint_request("cancel-route", [3, 2]))
+    wait_for(lambda: state(events, "cancel-route", "accepted"))
+    node.commands.put(
+        {
+            "version": 1,
+            "type": "cancel",
+            "request_id": "route-stop",
+            "robot_id": "agv1",
+            "target_request_id": "cancel-route",
+        }
+    )
+    wait_for(lambda: state(events, "cancel-route", "cancelled"))
+    assert [pose.pose.position.x for pose in observed] == [3]

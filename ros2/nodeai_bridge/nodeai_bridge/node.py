@@ -225,6 +225,7 @@ async def socket_server(node):
                     "type": "hello",
                     "mode": node.settings.get("mode", "ros"),
                     "robots": list(node.ports),
+                    "capabilities": ["navigate", "waypoints", "cancel"],
                 }
             )
         )

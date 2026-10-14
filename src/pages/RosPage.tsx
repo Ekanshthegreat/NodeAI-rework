@@ -13,12 +13,21 @@ export default function RosPage() {
     [pending, setPending] = useState<Record<string, string>>({});
   const [lastHeartbeat, setLastHeartbeat] = useState(0),
     [now, setNow] = useState(Date.now());
+  const [missionType, setMissionType] = useState<'navigate' | 'waypoints'>('navigate');
+  const [waypoints, setWaypoints] = useState([
+    { x: '1', y: '2', yaw: '0' },
+    { x: '3', y: '4', yaw: '0' },
+  ]);
+  const [waypointSupport, setWaypointSupport] = useState(false);
   const [mode, setMode] = useState<'ros' | 'test_fixture'>('ros');
   const client = useRef<BridgeClient | null>(null);
   useEffect(() => {
     client.current = new BridgeClient(
       (message) => {
-        if (message.type === 'hello') setMode(message.mode ?? 'ros');
+        if (message.type === 'hello') {
+          setMode(message.mode ?? 'ros');
+          setWaypointSupport(message.capabilities?.includes('waypoints') ?? false);
+        }
         if (message.type === 'robots') {
           setRobots(message.robots);
           setLastHeartbeat(Date.now());
@@ -37,6 +46,7 @@ export default function RosPage() {
                     event.type === 'navigation' &&
                     event.state === message.state &&
                     event.error === message.error &&
+                    event.completed_waypoints === message.completed_waypoints &&
                     event.request_id === message.request_id
                   )
               ),
@@ -87,11 +97,22 @@ export default function RosPage() {
     setError('');
     try {
       const id = crypto.randomUUID();
-      client.current?.navigate(
-        selected,
-        { x: Number(target.x), y: Number(target.y), yaw: Number(target.yaw) },
-        id
-      );
+      if (missionType === 'waypoints')
+        client.current?.waypoints(
+          selected,
+          waypoints.map((point) => ({
+            x: Number(point.x),
+            y: Number(point.y),
+            yaw: Number(point.yaw),
+          })),
+          id
+        );
+      else
+        client.current?.navigate(
+          selected,
+          { x: Number(target.x), y: Number(target.y), yaw: Number(target.yaw) },
+          id
+        );
       setPending((current) => ({ ...current, [selected]: id }));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -174,12 +195,17 @@ export default function RosPage() {
                   · Pose age{' '}
                   {r.pose_age_seconds === null ? 'unknown' : `${r.pose_age_seconds.toFixed(1)}s`}
                 </p>
+                {r.request_id && (
+                  <p className="field-help">
+                    Waypoints completed {r.completed_waypoints ?? 0} / {r.total_waypoints ?? 1}
+                  </p>
+                )}
               </article>
             ))
           )}
         </section>
         <section className="panel">
-          <h2>Navigate to a pose</h2>
+          <h2>ROS navigation mission</h2>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -196,18 +222,77 @@ export default function RosPage() {
                 <option key={r.id}>{r.id}</option>
               ))}
             </select>
-            {(['x', 'y', 'yaw'] as const).map((key) => (
-              <label key={key}>
-                {key === 'yaw' ? 'Yaw (radians)' : `${key.toUpperCase()} (metres)`}
-                <input
-                  type="number"
-                  step="any"
-                  required
-                  value={target[key]}
-                  onChange={(e) => setTarget((t) => ({ ...t, [key]: e.target.value }))}
-                />
-              </label>
-            ))}
+            <label htmlFor="ros-mission-type">Mission type</label>
+            <select
+              id="ros-mission-type"
+              value={missionType}
+              onChange={(event) => setMissionType(event.target.value as 'navigate' | 'waypoints')}
+            >
+              <option value="navigate">Single pose</option>
+              <option value="waypoints" disabled={!waypointSupport}>
+                Waypoint route
+              </option>
+            </select>
+            {missionType === 'waypoints' ? (
+              <div className="waypoint-editor">
+                {waypoints.map((point, index) => (
+                  <fieldset key={index}>
+                    <legend>Waypoint {index + 1}</legend>
+                    {(['x', 'y', 'yaw'] as const).map((key) => (
+                      <label key={key}>
+                        {key === 'yaw' ? 'Yaw (radians)' : `${key.toUpperCase()} (metres)`}
+                        <input
+                          type="number"
+                          step="any"
+                          required
+                          value={point[key]}
+                          onChange={(event) =>
+                            setWaypoints((current) =>
+                              current.map((value, i) =>
+                                i === index ? { ...value, [key]: event.target.value } : value
+                              )
+                            )
+                          }
+                        />
+                      </label>
+                    ))}
+                    <button
+                      type="button"
+                      className="quiet-button"
+                      disabled={waypoints.length === 1}
+                      onClick={() =>
+                        setWaypoints((current) => current.filter((_, i) => i !== index))
+                      }
+                    >
+                      Remove waypoint {index + 1}
+                    </button>
+                  </fieldset>
+                ))}
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={waypoints.length >= 20}
+                  onClick={() =>
+                    setWaypoints((current) => [...current, { x: '0', y: '0', yaw: '0' }])
+                  }
+                >
+                  Add waypoint
+                </button>
+              </div>
+            ) : (
+              (['x', 'y', 'yaw'] as const).map((key) => (
+                <label key={key}>
+                  {key === 'yaw' ? 'Yaw (radians)' : `${key.toUpperCase()} (metres)`}
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={target[key]}
+                    onChange={(e) => setTarget((t) => ({ ...t, [key]: e.target.value }))}
+                  />
+                </label>
+              ))
+            )}
             <p className="field-help">
               Target coordinates use the robot’s configured ROS frame. Nav2 owns route planning and
               obstacle avoidance.
@@ -217,7 +302,7 @@ export default function RosPage() {
               type="submit"
               disabled={!fresh || !robot?.ready || Boolean(activeRequest)}
             >
-              Send Nav2 goal
+              {missionType === 'waypoints' ? 'Send waypoint mission' : 'Send Nav2 goal'}
             </button>
           </form>
           {activeRequest && (
@@ -254,7 +339,7 @@ export default function RosPage() {
               <li key={i}>
                 <span>
                   {e.type === 'navigation'
-                    ? `${e.robot_id} · ${e.state} · ${e.request_id}${e.error ? ` · ${e.error}` : ''}`
+                    ? `${e.robot_id} · ${e.state} · ${e.completed_waypoints ?? 0}/${e.total_waypoints ?? 1} waypoints · ${e.request_id}${e.error ? ` · ${e.error}` : ''}`
                     : e.type === 'error'
                       ? e.message
                       : ''}
