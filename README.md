@@ -2,12 +2,95 @@
 
 [![Validate MVP](https://github.com/Ekanshthegreat/NodeAI-rework/actions/workflows/ci.yml/badge.svg)](https://github.com/Ekanshthegreat/NodeAI-rework/actions/workflows/ci.yml)
 
-A ROS 2 navigation workspace with a browser control page and a separate local
-fleet simulator. Version 0.3.0 adds bounded waypoint missions to the Jazzy
-bridge, with real Nav2 actions, localization and battery telemetry. The local simulator remains available without
-an account, database or robot hardware.
+**Typed robot missions, bounded recovery and recorded playback—with a separate
+ROS 2 bridge for real Nav2 actions.**
 
-![ROS control page with a labelled action-test fixture](docs/images/ros-waypoints.png)
+[Try the browser demo](https://ekanshthegreat.github.io/NodeAI-rework/) ·
+[Architecture](docs/ARCHITECTURE.md) · [ROS deployment](docs/ROS2.md) ·
+[Demo scenarios](docs/DEMO.md) · [Release history](CHANGELOG.md)
+
+NodeAI turns a constrained command into a validated mission, executes it through
+an explicit state machine, and records what happened for playback. Its ROS path
+sends single-pose or sequential waypoint goals through actual Jazzy action
+clients. The browser simulator runs without hardware, accounts or a backend.
+
+![Local mission control: robots, routes, execution events and recovery controls](docs/images/mission-control.png)
+
+| Local browser simulator | ROS 2 / Nav2 bridge |
+| --- | --- |
+| A* on a static map; three point-agent robots | Nav2 owns planning, costmaps and motion |
+| Navigation, delivery, inspection, charge and dock | Single pose or 1–20 sequential navigation poses |
+| One bounded replacement attempt and simulated cargo handoff | Hold assignment through cancellation and uncertain outcomes |
+| Browser snapshots, recorded playback and JSON export | Real localization/battery subscriptions and action feedback |
+| 56 TypeScript behavior tests | 23 lifecycle tests + 7 real ROS interface tests |
+
+The live Pages demo runs the local simulator. ROS control needs a separately
+running bridge; its validated test fixture is not a physical robot deployment.
+
+## Architecture at a glance
+
+```mermaid
+flowchart TB
+  subgraph Local[Local simulation]
+    Command[Constrained command] --> Validate[Parser and Zod contracts]
+    Validate --> Engine[Pure fixed-step fleet engine]
+    Grid[Static grid A-star planner] --> Engine
+    Engine --> Views[React views and Zustand store]
+    Views --> Snapshot[Validated browser snapshot]
+    Engine --> Record[Recorded frames and events]
+    Record --> Playback[Seek / playback / JSON export]
+  end
+  subgraph ROS[Separate ROS runtime]
+    UI[ROS browser controls] --> Client[Validated WebSocket protocol]
+    Client --> Gateway[Assignment and waypoint lifecycle]
+    Gateway --> Action[rclpy NavigateToPose client]
+    Action --> Nav2[Robot Nav2 action server]
+    Nav2 --> Action
+    Action --> Gateway
+    Telemetry[AMCL and battery topics] --> Gateway
+    Gateway --> Client
+  end
+```
+
+The simulator owns simulated state; Nav2 owns robot navigation. The two paths
+share a workspace, not an execution engine. UI components derive their displays
+from state and events rather than inventing completion.
+
+## What happens when a robot fails?
+
+```mermaid
+sequenceDiagram
+  participant Operator
+  participant Engine as Fleet engine
+  participant First as Assigned robot
+  participant Second as Replacement robot
+  participant Recorder
+  Operator->>Engine: Deliver Pharmacy to Ward A
+  Engine->>First: Travel, pick up, deliver
+  Operator->>Engine: Inject blocked fault after pickup
+  Engine->>Recorder: Record fault and stopped position
+  Note over Engine: Wait 3 simulated seconds; one recovery attempt
+  Engine->>Second: Route to stopped robot
+  Second->>First: Simulated cargo handoff
+  Engine->>Second: Continue delivery to Ward A
+  Engine->>Recorder: Terminal state and frames
+  Operator->>Recorder: Replay recorded run
+```
+
+Recovery can fail: no eligible replacement, an unreachable route or an exhausted
+retry budget produces a visible terminal failure. The simulator's cargo handoff
+is a modeled operation, not a robot protocol.
+
+## Engineering decisions
+
+| Decision | Why it matters | Evidence |
+| --- | --- | --- |
+| Pure fixed-step engine | Repeatable state transitions independent of React effects | [Engine and fault tests](src/simulation/engine.test.ts) |
+| Validate before dispatch | Unsupported commands and unreachable routes never start execution | [Planner tests](src/lib/planner.test.ts) |
+| Bounded retries and history | Recovery and recording cannot grow indefinitely | [Engine](src/simulation/engine.ts), [persistence](src/simulation/persistence.ts) |
+| Playback reads recorded frames | Inspect the actual retained run without re-executing it | [Replay lookup](src/simulation/replay.ts) |
+| Per-leg callback generations | Late feedback from a finished waypoint cannot mutate its successor | [ROS lifecycle tests](ros2/nodeai_bridge/test/test_gateway.py) |
+| Cancel acknowledgement is not completion | Keep the robot assigned until its terminal action result | [Gateway](ros2/nodeai_bridge/nodeai_bridge/gateway.py) |
 
 ## Run it
 
@@ -21,7 +104,17 @@ npm run dev
 Open the local URL printed by Vite and choose **Open mission control**. No `.env`
 file is required for the local demo. For a production build, run `npm run build`
 and `npm run preview`. Deploy `dist/` on a static host with all application paths
-rewritten to `index.html`; `/app` and `/app/replay` are client routes.
+rewritten to `index.html`; `/app` and `/app/replay` are client routes. The Pages
+workflow uses the repository asset base and hash routes, so direct links and
+refreshes work on GitHub's static host. To check that build locally:
+
+```sh
+VITE_ROUTER=hash npm run build -- --base=/NodeAI-rework/
+npm run preview -- --base=/NodeAI-rework/
+```
+
+Open `/NodeAI-rework/#/app` on the preview server. Pages deployment follows a
+successful main-branch CI run; pull requests do not publish.
 
 ## ROS 2 / Nav2
 
@@ -30,6 +123,22 @@ includes an `ament_python` package, launch/configuration files, Nav2 goal and
 cancellation handling, telemetry subscriptions and actual ROS action tests.
 See [ROS deployment and protocol](docs/ROS2.md) for setup and the container test
 fixture. The browser does not use simulated robot movement in this mode.
+
+```mermaid
+flowchart LR
+  Ready[Readiness and whole-route validation] --> Dispatch[Send one waypoint]
+  Dispatch --> Active[Accepted / running]
+  Active --> Result{Terminal result}
+  Result -->|Success and more poses| Recheck[Recheck readiness]
+  Recheck --> Dispatch
+  Result -->|Final success| Done[Succeeded]
+  Active --> Cancel[Cancelling]
+  Cancel --> Result
+  Result -->|Cancelled or failed| Stop[Stop route]
+  Active -->|Missing response or result| Hold[Unknown: hold assignment]
+```
+
+![Two-stop route completed through the labelled ROS action fixture](docs/images/ros-waypoints.png)
 
 ROS integration currently covers single-pose and sequential waypoint navigation. Robot-specific pickup,
 delivery, docking/charging handlers and restart reconciliation remain future
@@ -106,6 +215,9 @@ and replay lookup. CI installs from the lockfile and runs these checks, plus a s
 container job with 30 ROS lifecycle/integration tests. The MVP
 was also exercised in the browser on desktop and at a 390-pixel mobile width.
 
+<details>
+<summary><strong>Simulation and integration boundaries</strong></summary>
+
 ## Simulation boundaries
 
 The executor advances 100 simulated milliseconds per timer callback. Browser
@@ -134,3 +246,5 @@ The older generic adapter UI, RMF, VDA5050 and Supabase modules are retained fro
 prototype under `src/adapters/` and `src/lib/`. They are not used by the local execution path or the new ROS control page and have not been validated against hardware or live vendor
 services. Environment examples are only for those integrations. This is a
 software simulation MVP, not a production robot controller.
+
+</details>
