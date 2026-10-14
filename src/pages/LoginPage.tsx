@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Bot, MapPin, Activity, RotateCcw } from 'lucide-react';
 export default function LoginPage() {
+  const hostedDemo = import.meta.env.VITE_ROUTER === 'hash';
   return (
     <main className="landing">
       <div className="landing-brand">
@@ -19,11 +20,12 @@ export default function LoginPage() {
           Connect ROS 2 robots, send Nav2 goals and inspect action results. Use the local simulator
           to explore mission execution, recovery and recorded replay without hardware.
         </p>
-        <Link className="primary-button" to="/app/ros">
-          Open ROS mission control <ArrowRight size={18} />
+        <Link className="primary-button" to={hostedDemo ? '/app' : '/app/ros'}>
+          {hostedDemo ? 'Try the local simulation' : 'Open ROS mission control'}{' '}
+          <ArrowRight size={18} />
         </Link>
-        <Link className="secondary-button" to="/app">
-          Try the local simulation
+        <Link className="secondary-button" to={hostedDemo ? '/app/ros' : '/app'}>
+          {hostedDemo ? 'Open ROS mission control' : 'Try the local simulation'}
         </Link>
         <p className="landing-note">
           ROS mode needs a running bridge and Nav2 stack. The local simulator requires no account or
@@ -53,6 +55,13 @@ export default function LoginPage() {
             );
           })}
         </div>
+        <p className="landing-note">
+          <a href="https://github.com/Ekanshthegreat/NodeAI-rework">Source and architecture</a>
+          {' · '}
+          <a href="https://github.com/Ekanshthegreat/NodeAI-rework/blob/main/docs/DEMO.md">
+            Guided demo scenarios
+          </a>
+        </p>
         <p className="scope-note">
           ROS mode covers navigation goals. Compound robot tasks and automatic reassignment
           currently belong to the local simulator. The ROS test fixture uses synthetic telemetry and
