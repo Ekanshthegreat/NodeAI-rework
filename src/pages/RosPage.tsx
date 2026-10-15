@@ -42,9 +42,10 @@ export default function RosPage() {
           );
         }
         if (message.type === 'navigation' || message.type === 'error') {
-          setJournal((current) =>
-            observeEvent(current, message, modeRef.current, Date.now(), bridgeSession.current)
-          );
+          const receivedAt = Date.now();
+          const source = modeRef.current;
+          const session = bridgeSession.current;
+          setJournal((current) => observeEvent(current, message, source, receivedAt, session));
           setEvents((current) =>
             [
               message,
