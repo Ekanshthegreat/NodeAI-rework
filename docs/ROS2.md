@@ -153,6 +153,25 @@ counts are bounded. Outbound messages are `hello`, `robots`, `navigation` and
 `error`; `src/ros/client.ts` validates them. Transport overload is logged, and
 heartbeats reconcile current assignment rather than inventing a terminal result.
 
+## Export browser observations
+
+**Export observed events** downloads a version-1 JSON record of navigation and
+error messages received on this page. Each event includes a sequence number,
+UTC browser receipt time, bridge-session number and `ros` or `test_fixture`
+source. The record stays available after disconnecting, until the page is left
+or reloaded. It is held in memory, not browser storage or the ROS bridge.
+
+At most 500 observations are retained. Only consecutive `running` feedback for
+the same request, robot, waypoint and bridge session is coalesced; the latest
+remaining distance is kept. Lifecycle changes and errors remain distinct.
+Sequence gaps can represent coalesced feedback. `dropped_events` separately
+counts history entries evicted at the retention limit.
+
+Receipt times are not ROS timestamps. This export cannot reconstruct a robot's
+trajectory, prove what happened during disconnection, or reconcile actions after
+bridge restart. The page's shorter event list shows recent state changes; the
+JSON contains the larger retained observation history.
+
 ## Run the actual ROS tests without hardware
 
 ```sh

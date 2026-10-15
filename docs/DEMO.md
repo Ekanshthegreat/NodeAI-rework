@@ -66,3 +66,8 @@ terminal event should be cancelled and no remaining leg should start. Set the
 second waypoint's X to −1 to exercise a later rejection: the mission fails after
 one completed waypoint. The fixture is a ROS action transport test, not a
 physical robot or a full Nav2 planner.
+
+After a ROS fixture route succeeds, choose **Export observed events**. The JSON
+should identify `test_fixture`, retain the waypoint transitions and finish with
+`succeeded` and `completed_waypoints: 2`. Disconnecting keeps the observed log
+available; refreshing starts a new browser record.

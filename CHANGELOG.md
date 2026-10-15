@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Download bounded ROS observation records with browser timestamps, per-connection provenance and explicit history limits.
+- Show remaining distance from actual Nav2 feedback; preserve lifecycle events while coalescing consecutive feedback.
+
 - Validate every saved replay fleet, execution cursor and event timeline before restoring a snapshot.
 - Reject missing/duplicate robots, foreign-site frames, future events and reused event sequences through the existing recoverable-state path.
 
