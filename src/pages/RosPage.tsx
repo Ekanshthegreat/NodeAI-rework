@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BridgeClient, type BridgeMessage, type RosRobot } from '../ros/client';
+import { createJournal, observeEvent, exportJournal } from '../ros/journal';
 export default function RosPage() {
   const [address, setAddress] = useState('ws://127.0.0.1:8765');
   const [connected, setConnected] = useState(false),
@@ -20,12 +21,17 @@ export default function RosPage() {
   ]);
   const [waypointSupport, setWaypointSupport] = useState(false);
   const [mode, setMode] = useState<'ros' | 'test_fixture'>('ros');
+  const [journal, setJournal] = useState(createJournal);
+  const bridgeSession = useRef(0);
+  const modeRef = useRef<'ros' | 'test_fixture'>('ros');
   const client = useRef<BridgeClient | null>(null);
   useEffect(() => {
     client.current = new BridgeClient(
       (message) => {
         if (message.type === 'hello') {
           setMode(message.mode ?? 'ros');
+          modeRef.current = message.mode ?? 'ros';
+          bridgeSession.current += 1;
           setWaypointSupport(message.capabilities?.includes('waypoints') ?? false);
         }
         if (message.type === 'robots') {
@@ -36,6 +42,9 @@ export default function RosPage() {
           );
         }
         if (message.type === 'navigation' || message.type === 'error') {
+          setJournal((current) =>
+            observeEvent(current, message, modeRef.current, Date.now(), bridgeSession.current)
+          );
           setEvents((current) =>
             [
               message,
@@ -326,7 +335,29 @@ export default function RosPage() {
         </section>
       </div>
       <section className="panel event-panel">
-        <h2>Navigation events</h2>
+        <div className="panel-heading">
+          <h2>Navigation events</h2>
+          <button
+            className="secondary-button"
+            disabled={journal.events.length === 0}
+            onClick={() => {
+              const blob = new Blob([exportJournal(journal)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = 'nodeai-ros-observations.json';
+              link.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            Export observed events
+          </button>
+        </div>
+        <p className="field-help">
+          {journal.events.length} retained observations · {journal.dropped_events} discarded at the
+          history limit. Consecutive feedback is coalesced. Export uses browser receipt times and
+          includes fixture labels.
+        </p>
         <p className="field-help">
           Acceptance means Nav2 received the goal; success appears only after the action result.
           Unknown outcomes keep the robot occupied.
@@ -339,7 +370,7 @@ export default function RosPage() {
               <li key={i}>
                 <span>
                   {e.type === 'navigation'
-                    ? `${e.robot_id} · ${e.state} · ${e.completed_waypoints ?? 0}/${e.total_waypoints ?? 1} waypoints · ${e.request_id}${e.error ? ` · ${e.error}` : ''}`
+                    ? `${e.robot_id} · ${e.state} · ${e.completed_waypoints ?? 0}/${e.total_waypoints ?? 1} waypoints · ${e.request_id}${e.distance_remaining != null ? ` · ${e.distance_remaining.toFixed(2)} m remaining` : ''}${e.error ? ` · ${e.error}` : ''}`
                     : e.type === 'error'
                       ? e.message
                       : ''}
