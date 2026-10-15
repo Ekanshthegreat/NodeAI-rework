@@ -123,14 +123,39 @@ export function decodeSnapshot(text: string): FleetState {
     throw new Error('Saved counters would reuse identifiers');
   if (Object.keys(s.faults).some((id) => !ids.has(id))) throw new Error('Unknown faulted robot');
   for (const [id, recording] of Object.entries(s.recordings)) {
+    const execution = s.missions.find((m) => m.id === id);
     if (
       !missionIds.has(id) ||
       recording.missionId !== id ||
       recording.frames.some(
-        (f, i) => !ids.has(f.robotId) || (i > 0 && f.at < recording.frames[i - 1].at)
+        (f, i) =>
+          !ids.has(f.robotId) || f.at > s.elapsedMs || (i > 0 && f.at < recording.frames[i - 1].at)
       )
     )
       throw new Error('Invalid recording references or timestamps');
+    for (const f of recording.frames) {
+      const frameIds = new Set(f.robots.map((r) => r.id));
+      if (
+        frameIds.size !== f.robots.length ||
+        frameIds.size !== ids.size ||
+        !frameIds.has(f.robotId) ||
+        f.robots.some((r) => !ids.has(r.id) || r.site_id !== s.site.id) ||
+        f.step > execution!.plan.subtasks.length
+      )
+        throw new Error('Invalid recorded fleet or execution step');
+    }
+    if (
+      recording.events.some(
+        (e, i) =>
+          e.missionId !== id ||
+          (e.robotId !== null && !ids.has(e.robotId)) ||
+          e.at > s.elapsedMs ||
+          e.sequence >= s.nextEvent ||
+          (i > 0 &&
+            (e.at < recording.events[i - 1].at || e.sequence <= recording.events[i - 1].sequence))
+      )
+    )
+      throw new Error('Invalid recorded event ownership, ordering or timestamp');
   }
   for (const m of s.missions) {
     if (

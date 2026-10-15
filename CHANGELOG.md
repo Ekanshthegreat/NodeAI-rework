@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Validate every saved replay fleet, execution cursor and event timeline before restoring a snapshot.
+- Reject missing/duplicate robots, foreign-site frames, future events and reused event sequences through the existing recoverable-state path.
+
 ## 0.3.0 — 2026-10-14
 
 - Sequential waypoint missions with 1–20 validated poses and one assignment per robot.

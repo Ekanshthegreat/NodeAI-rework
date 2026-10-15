@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { createDemoState, submitMission } from './engine';
+import {
+  createDemoState,
+  submitMission,
+  tickFleet,
+  cancelMission,
+  setMissionPaused,
+} from './engine';
 import { decodeSnapshot } from './persistence';
 describe('saved fleet validation', () => {
   it('round-trips an active mission and its recording', () => {
@@ -55,4 +61,56 @@ it('rejects non-monotonic replay timestamps', () => {
     { ...frame, at: 100 },
   ];
   expect(() => decodeSnapshot(JSON.stringify(s))).toThrow('timestamps');
+});
+
+describe('recorded fleet integrity', () => {
+  it.each(['duplicate', 'unknown', 'missing', 'wrong-site', 'step'])(
+    'rejects a %s recorded fleet state',
+    (corruption) => {
+      const s = submitMission(createDemoState(0), 'Go to Pharmacy');
+      const frame = s.recordings.M001.frames[0];
+      if (corruption === 'duplicate') frame.robots[1].id = frame.robots[0].id;
+      if (corruption === 'unknown') frame.robots[1].id = 'missing';
+      if (corruption === 'missing') frame.robots = [];
+      if (corruption === 'wrong-site') frame.robots[0].site_id = 'other';
+      if (corruption === 'step') frame.step = 100;
+      expect(() => decodeSnapshot(JSON.stringify(s))).toThrow('recorded fleet');
+    }
+  );
+  it('rejects a frame from the future', () => {
+    const s = submitMission(createDemoState(0), 'Go to Pharmacy');
+    s.recordings.M001.frames[0].at = s.elapsedMs + 1;
+    expect(() => decodeSnapshot(JSON.stringify(s))).toThrow('timestamps');
+  });
+  it.each(['ownership', 'robot', 'future', 'counter', 'duplicate', 'time-order'])(
+    'rejects recorded event %s corruption',
+    (corruption) => {
+      let s = submitMission(createDemoState(0), 'Go to Pharmacy');
+      s = tickFleet(s);
+      s = cancelMission(s, 'M001');
+      // Keep corruption local to the recording, not the shared live event object.
+      s.recordings.M001.events = structuredClone(s.recordings.M001.events);
+      const events = s.recordings.M001.events;
+      if (corruption === 'ownership') events[0].missionId = 'M999';
+      if (corruption === 'robot') events[0].robotId = 'missing';
+      if (corruption === 'future') events[1].at = s.elapsedMs + 1;
+      if (corruption === 'counter') events[1].sequence = s.nextEvent;
+      if (corruption === 'duplicate') events[1].sequence = events[0].sequence;
+      if (corruption === 'time-order') events[0].at = s.elapsedMs;
+      if (corruption === 'time-order') events[1].at = 0;
+      expect(() => decodeSnapshot(JSON.stringify(s))).toThrow('recorded event');
+    }
+  );
+  it('accepts completed and pause/resume/cancel recordings', () => {
+    let completed = submitMission(createDemoState(0), 'Go to Pharmacy');
+    for (let i = 0; i < 600 && completed.missions[0].status === 'active'; i++)
+      completed = tickFleet(completed);
+    expect(completed.missions[0].status).toBe('completed');
+    expect(decodeSnapshot(JSON.stringify(completed))).toEqual(completed);
+    let paused = submitMission(createDemoState(0), 'Go to Pharmacy');
+    paused = setMissionPaused(paused, 'M001', true);
+    paused = setMissionPaused(paused, 'M001', false);
+    paused = cancelMission(paused, 'M001');
+    expect(decodeSnapshot(JSON.stringify(paused))).toEqual(paused);
+  });
 });
