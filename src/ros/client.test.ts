@@ -145,4 +145,109 @@ describe('ROS bridge client', () => {
     expect(JSON.parse(socket.sent[0]).targets).toHaveLength(2);
     client.disconnect();
   });
+  it('rejects a second handshake before its mode can relabel observations', async () => {
+    const { client, socket, receive, warning } = setup();
+    const connected = client.connect('ws://localhost:8765');
+    socket.message({ ...hello, mode: 'test_fixture' });
+    await connected;
+    socket.message({ ...hello, mode: 'ros' });
+    expect(warning).toHaveBeenCalledWith(expect.stringContaining('second handshake'));
+    expect(receive).toHaveBeenCalledTimes(1);
+    expect(socket.closed).toBe(true);
+    expect(() => client.navigate('agv1', { x: 0, y: 0, yaw: 0 }, 'one')).toThrow('not connected');
+  });
+  it('rejects duplicate handshake robot IDs and closes an oversized message', async () => {
+    const { client, socket, warning } = setup();
+    const connected = client.connect('ws://localhost:8765');
+    const rejected = expect(connected).rejects.toThrow('ended');
+    socket.message({ ...hello, robots: ['agv1', 'agv1'] });
+    await rejected;
+    expect(socket.closed).toBe(true);
+    const retry = client.connect('ws://localhost:8765');
+    const timeout = expect(retry).rejects.toThrow('ended');
+    socket.onmessage?.({ data: ' '.repeat(65537) });
+    await timeout;
+    expect(warning).toHaveBeenLastCalledWith(expect.stringContaining('64 KiB'));
+  });
+  it('ignores foreign and duplicate snapshots without losing a valid session', async () => {
+    const { client, socket, receive } = setup();
+    const connected = client.connect('ws://localhost:8765');
+    socket.message(hello);
+    await connected;
+    const robot = {
+      id: 'agv1',
+      frame_id: 'map',
+      pose: null,
+      pose_age_seconds: null,
+      battery: null,
+      ready: false,
+      request_id: null,
+      state: 'idle',
+    };
+    socket.message({ version: 1, type: 'robots', robots: [robot, robot] });
+    socket.message({ version: 1, type: 'robots', robots: [{ ...robot, id: 'foreign' }] });
+    socket.message({
+      version: 1,
+      type: 'navigation',
+      robot_id: 'foreign',
+      request_id: 'one',
+      state: 'running',
+      error: null,
+    });
+    expect(receive).toHaveBeenCalledTimes(1);
+    socket.message({ version: 1, type: 'robots', robots: [robot] });
+    expect(receive).toHaveBeenCalledTimes(2);
+    expect(() => client.cancel('foreign', 'one', 'cancel')).toThrow('not advertised');
+    client.navigate('agv1', { x: 0, y: 0, yaw: 0 }, 'one');
+    expect(socket.sent).toHaveLength(1);
+    client.disconnect();
+  });
+  it('does not accept callbacks or robot identities from a replaced connection', async () => {
+    const first = new Socket(),
+      second = new Socket(),
+      receive = vi.fn();
+    const factory = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const client = new BridgeClient(receive, vi.fn(), vi.fn(), factory);
+    const connected = client.connect('ws://localhost:8765');
+    first.message(hello);
+    await connected;
+    const staleCallback = first.onmessage;
+    const next = client.connect('ws://localhost:8766');
+    staleCallback?.({ data: JSON.stringify(hello) });
+    expect(receive).toHaveBeenCalledTimes(1);
+    second.message({ ...hello, robots: ['agv2'] });
+    await next;
+    expect(() => client.navigate('agv1', { x: 0, y: 0, yaw: 0 }, 'one')).toThrow('not advertised');
+    client.navigate('agv2', { x: 0, y: 0, yaw: 0 }, 'two');
+    expect(second.sent).toHaveLength(1);
+    client.disconnect();
+  });
+  it('returns a rejected promise for malformed URLs without disturbing a connection', async () => {
+    const { client, socket } = setup();
+    const connected = client.connect('ws://localhost:8765');
+    socket.message(hello);
+    await connected;
+    await expect(client.connect('not a url')).rejects.toThrow('valid loopback');
+    expect(socket.closed).toBe(false);
+    client.navigate('agv1', { x: 0, y: 0, yaw: 0 }, 'one');
+    client.disconnect();
+  });
+  it('measures the message limit in UTF-8 bytes, not JavaScript characters', async () => {
+    const { client, socket, receive, warning } = setup();
+    const connected = client.connect('ws://localhost:8765');
+    socket.message(hello);
+    await connected;
+    const data = JSON.stringify({
+      version: 1,
+      type: 'error',
+      request_id: null,
+      message: '界'.repeat(22000),
+    });
+    expect(data.length).toBeLessThan(65536);
+    socket.onmessage?.({ data });
+    expect(warning).toHaveBeenCalledWith(expect.stringContaining('64 KiB'));
+    expect(socket.closed).toBe(true);
+    expect(receive).toHaveBeenCalledTimes(1);
+    client.disconnect();
+  });
 });

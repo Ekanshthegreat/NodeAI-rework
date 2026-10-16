@@ -76,6 +76,7 @@ export class BridgeClient {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private handshake = false;
   private waypointSupport = false;
+  private robotIds = new Set<string>();
   constructor(
     private receive: (message: BridgeMessage) => void,
     private connection: (connected: boolean) => void,
@@ -102,7 +103,12 @@ export class BridgeClient {
     }
   ) {}
   connect(address: string): Promise<void> {
-    const url = new URL(address);
+    let url: URL;
+    try {
+      url = new URL(address);
+    } catch {
+      return Promise.reject(new Error('Enter a valid loopback WebSocket URL.'));
+    }
     if (
       !['ws:', 'wss:'].includes(url.protocol) ||
       !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ||
@@ -129,9 +135,22 @@ export class BridgeClient {
         fail('ROS bridge disconnected. Goals are not automatically cancelled or resubmitted.');
       socket.onmessage = (event) => {
         if (this.socket !== socket) return;
+        if (event.data.length > 65536 || new TextEncoder().encode(event.data).byteLength > 65536) {
+          fail('ROS bridge message exceeds the 64 KiB limit');
+          return;
+        }
         try {
           const message = BridgeMessage.parse(JSON.parse(event.data));
           if (message.type === 'hello') {
+            if (this.handshake) {
+              fail('ROS bridge sent a second handshake; reconnect to establish a new session.');
+              return;
+            }
+            if (new Set(message.robots).size !== message.robots.length) {
+              fail('ROS bridge handshake contains duplicate robot IDs');
+              return;
+            }
+            this.robotIds = new Set(message.robots);
             this.handshake = true;
             this.waypointSupport = message.capabilities?.includes('waypoints') ?? false;
             this.rejectConnection = null;
@@ -139,6 +158,21 @@ export class BridgeClient {
             this.timer = null;
             this.connection(true);
             resolve();
+          }
+          if (this.handshake && message.type === 'robots') {
+            const ids = message.robots.map((robot) => robot.id);
+            if (new Set(ids).size !== ids.length || ids.some((id) => !this.robotIds.has(id))) {
+              this.warning('Ignored a robot snapshot with duplicate or unadvertised robot IDs');
+              return;
+            }
+          }
+          if (
+            this.handshake &&
+            message.type === 'navigation' &&
+            !this.robotIds.has(message.robot_id)
+          ) {
+            this.warning('Ignored navigation feedback for an unadvertised robot');
+            return;
           }
           if (this.handshake) this.receive(message);
         } catch {
@@ -148,6 +182,7 @@ export class BridgeClient {
     });
   }
   navigate(robotId: string, target: z.infer<typeof Target>, requestId: string): void {
+    this.requireRobot(robotId);
     this.send({
       version: 1,
       type: 'navigate',
@@ -157,6 +192,7 @@ export class BridgeClient {
     });
   }
   waypoints(robotId: string, targets: z.infer<typeof WaypointTargets>, requestId: string): void {
+    this.requireRobot(robotId);
     const validated = WaypointTargets.parse(targets);
     if (!this.waypointSupport)
       throw new Error('The connected bridge does not support waypoint missions');
@@ -169,6 +205,7 @@ export class BridgeClient {
     });
   }
   cancel(robotId: string, targetRequestId: string, requestId: string): void {
+    this.requireRobot(robotId);
     this.send({
       version: 1,
       type: 'cancel',
@@ -176,6 +213,10 @@ export class BridgeClient {
       robot_id: id.parse(robotId),
       target_request_id: id.parse(targetRequestId),
     });
+  }
+  private requireRobot(robotId: string): void {
+    if (!this.handshake) throw new Error('ROS bridge is not connected');
+    if (!this.robotIds.has(robotId)) throw new Error('Robot was not advertised by this ROS bridge');
   }
   private send(data: unknown): void {
     if (!this.handshake || this.socket?.readyState !== 1)
@@ -191,6 +232,7 @@ export class BridgeClient {
     this.socket = null;
     this.handshake = false;
     this.waypointSupport = false;
+    this.robotIds.clear();
     if (socket) {
       socket.onopen = socket.onclose = socket.onerror = socket.onmessage = null;
       socket.close();
