@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Keep one handshake and robot roster per browser bridge connection; reject duplicate identities and foreign feedback.
+- Bound inbound bridge messages by UTF-8 size and preserve the current connection when an invalid address is entered.
+
 - Download bounded ROS observation records with browser timestamps, per-connection provenance and explicit history limits.
 - Show remaining distance from actual Nav2 feedback; preserve lifecycle events while coalescing consecutive feedback.
 

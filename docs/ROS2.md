@@ -153,6 +153,16 @@ counts are bounded. Outbound messages are `hello`, `robots`, `navigation` and
 `error`; `src/ros/client.ts` validates them. Transport overload is logged, and
 heartbeats reconcile current assignment rather than inventing a terminal result.
 
+The browser accepts one `hello` per connection, with unique robot IDs. A second
+handshake closes the connection rather than changing its source mode or robot
+identity in place. Reconnect explicitly after a bridge restart or roster change.
+Commands are restricted to the advertised robots; snapshots with duplicate or
+unadvertised IDs and navigation feedback for other robots are ignored. An invalid
+snapshot does not refresh the heartbeat, so stale dispatch protection still applies.
+Inbound bridge messages above 64 KiB of UTF-8 text close the browser connection.
+This is separate from the server's 8 KiB incoming-command limit. Neither closure
+automatically cancels a goal on the robot.
+
 ## Export browser observations
 
 **Export observed events** downloads a version-1 JSON record of navigation and

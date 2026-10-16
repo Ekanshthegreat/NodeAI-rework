@@ -21,7 +21,7 @@ clients. The browser simulator runs without hardware, accounts or a backend.
 | Navigation, delivery, inspection, charge and dock | Single pose or 1–20 sequential navigation poses |
 | One bounded replacement attempt and simulated cargo handoff | Hold assignment through cancellation and uncertain outcomes |
 | Browser snapshots, recorded playback and JSON export | Real localization/battery subscriptions and action feedback |
-| 74 TypeScript behavior tests | 23 lifecycle tests + 7 real ROS interface tests |
+| 80 TypeScript behavior tests | 23 lifecycle tests + 7 real ROS interface tests |
 
 The live Pages demo runs the local simulator. ROS control needs a separately
 running bridge; its validated test fixture is not a physical robot deployment.
@@ -208,7 +208,7 @@ npm run test:run
 npm run build
 ```
 
-The browser/simulation release has 74 automated tests covering coordinate transforms, command and
+The browser/simulation release has 80 automated tests covering coordinate transforms, command and
 route validation, mission execution, recovery budgets, cargo handoff, persistence
 and replay lookup. CI installs from the lockfile and runs these checks, plus a separate Jazzy
 container job with 30 ROS lifecycle/integration tests. The MVP
