@@ -182,6 +182,26 @@ trajectory, prove what happened during disconnection, or reconcile actions after
 bridge restart. The page's shorter event list shows recent state changes; the
 JSON contains the larger retained observation history.
 
+### Inspect a saved record
+
+From **Navigation events**, choose **Open saved observations**, or open
+`/app/ros/records` (on Pages, `#/app/ros/records`). Choose the exported JSON file;
+the viewer checks version, message schemas, sequence order, retention counts,
+waypoint progress and source labels within each bridge session. Imports are
+limited to 2 MiB and 500 events. Invalid files clear the previous record and
+show an error. Files remain in page memory and are not uploaded or persisted.
+
+Filter by bridge session before comparing reused request IDs. Robot filters
+exclude protocol errors that have no robot ID; request filters retain errors
+with matching request IDs. Rows remain in recorded sequence order even if the
+browser wall clock moved backward. **Load example** uses illustrative fixture
+events, not a physical robot run. Source labels describe the export's contents;
+the viewer does not authenticate the file or its origin.
+
+This page does not initialize the simulation store, create a bridge client or
+send commands. It displays observations only, without reconstructing positions,
+inferring missing transitions or claiming the final state is still current.
+
 ## Run the actual ROS tests without hardware
 
 ```sh

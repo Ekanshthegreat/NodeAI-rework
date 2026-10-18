@@ -21,7 +21,7 @@ clients. The browser simulator runs without hardware, accounts or a backend.
 | Navigation, delivery, inspection, charge and dock | Single pose or 1–20 sequential navigation poses |
 | One bounded replacement attempt and simulated cargo handoff | Hold assignment through cancellation and uncertain outcomes |
 | Browser snapshots, recorded playback and JSON export | Real localization/battery subscriptions and action feedback |
-| 80 TypeScript behavior tests | 23 lifecycle tests + 7 real ROS interface tests |
+| 86 TypeScript behavior tests | 23 lifecycle tests + 7 real ROS interface tests |
 
 The live Pages demo runs the local simulator. ROS control needs a separately
 running bridge; its validated test fixture is not a physical robot deployment.
@@ -120,6 +120,10 @@ successful main-branch CI run; pull requests do not publish.
 Open **ROS 2** in the application for the live bridge page. The repository now
 includes an `ament_python` package, launch/configuration files, Nav2 goal and
 cancellation handling, telemetry subscriptions and actual ROS action tests.
+Saved ROS event exports can be opened offline with session, robot and request filters
+at `#/app/ros/records` on Pages. A labeled fixture example is included. The viewer
+does not connect to ROS or change the local simulation.
+
 See [ROS deployment and protocol](docs/ROS2.md) for setup and the container test
 fixture. The browser does not use simulated robot movement in this mode.
 
@@ -208,7 +212,7 @@ npm run test:run
 npm run build
 ```
 
-The browser/simulation release has 80 automated tests covering coordinate transforms, command and
+The browser/simulation release has 86 automated tests covering coordinate transforms, command and
 route validation, mission execution, recovery budgets, cargo handoff, persistence
 and replay lookup. CI installs from the lockfile and runs these checks, plus a separate Jazzy
 container job with 30 ROS lifecycle/integration tests. The MVP

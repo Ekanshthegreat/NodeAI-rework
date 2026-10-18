@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Open saved ROS observation JSON offline, with bounded validation and session/robot/request filters.
+- Include an explicitly labeled fixture example; imported records do not connect to ROS or modify the fleet.
+
 - Keep one handshake and robot roster per browser bridge connection; reject duplicate identities and foreign feedback.
 - Bound inbound bridge messages by UTF-8 size and preserve the current connection when an invalid address is entered.
 
