@@ -909,3 +909,29 @@ p {
     grid-template-columns: 1fr;
   }
 }
+.observation-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 16px;
+  margin: 16px 0;
+}
+.observation-controls label {
+  display: grid;
+  gap: 6px;
+  max-width: 100%;
+}
+.observation-controls input {
+  max-width: 100%;
+}
+.observation-table {
+  min-width: 700px;
+}
+.observation-table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.observation-table time {
+  font-size: 11px;
+}

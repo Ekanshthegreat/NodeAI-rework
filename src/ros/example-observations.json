@@ -1,0 +1,89 @@
+{
+  "format_version": 1,
+  "kind": "nodeai_ros_observations",
+  "started_at": "2026-10-17T12:00:00.000Z",
+  "exported_at": "2026-10-17T12:00:12.000Z",
+  "scope": "Illustrative test-fixture observations, not a physical robot run.",
+  "next_sequence": 7,
+  "dropped_events": 0,
+  "events": [
+    {
+      "sequence": 1,
+      "received_at": "2026-10-17T12:00:01.000Z",
+      "source": "test_fixture",
+      "bridge_session": 1,
+      "message": {
+        "version": 1,
+        "type": "navigation",
+        "robot_id": "agv1",
+        "request_id": "route-1",
+        "state": "accepted",
+        "error": null,
+        "completed_waypoints": 0,
+        "total_waypoints": 2
+      }
+    },
+    {
+      "sequence": 3,
+      "received_at": "2026-10-17T12:00:03.000Z",
+      "source": "test_fixture",
+      "bridge_session": 1,
+      "message": {
+        "version": 1,
+        "type": "navigation",
+        "robot_id": "agv1",
+        "request_id": "route-1",
+        "state": "running",
+        "error": null,
+        "completed_waypoints": 0,
+        "total_waypoints": 2,
+        "distance_remaining": 1.4
+      }
+    },
+    {
+      "sequence": 4,
+      "received_at": "2026-10-17T12:00:05.000Z",
+      "source": "test_fixture",
+      "bridge_session": 1,
+      "message": {
+        "version": 1,
+        "type": "navigation",
+        "robot_id": "agv1",
+        "request_id": "route-1",
+        "state": "succeeded",
+        "error": null,
+        "completed_waypoints": 2,
+        "total_waypoints": 2,
+        "distance_remaining": 0
+      }
+    },
+    {
+      "sequence": 5,
+      "received_at": "2026-10-17T12:00:09.000Z",
+      "source": "test_fixture",
+      "bridge_session": 2,
+      "message": {
+        "version": 1,
+        "type": "navigation",
+        "robot_id": "agv2",
+        "request_id": "route-1",
+        "state": "rejected",
+        "error": "Localization is stale",
+        "completed_waypoints": 0,
+        "total_waypoints": 1
+      }
+    },
+    {
+      "sequence": 6,
+      "received_at": "2026-10-17T12:00:10.000Z",
+      "source": "test_fixture",
+      "bridge_session": 2,
+      "message": {
+        "version": 1,
+        "type": "error",
+        "request_id": "route-1",
+        "message": "Example rejection; no goal was sent to a robot."
+      }
+    }
+  ]
+}

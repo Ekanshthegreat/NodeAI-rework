@@ -338,6 +338,9 @@ export default function RosPage() {
       <section className="panel event-panel">
         <div className="panel-heading">
           <h2>Navigation events</h2>
+          <Link to="/app/ros/records" className="text-link">
+            Open saved observations ↗
+          </Link>
           <button
             className="secondary-button"
             disabled={journal.events.length === 0}

@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import RosPage from './pages/RosPage';
 import ReplayPage from './pages/ReplayPage';
+import RosRecordsPage from './pages/RosRecordsPage';
 import Layout from './components/Layout/Layout';
 
 // Hash routes support refreshes on static GitHub Pages without server rewrites.
@@ -29,6 +30,16 @@ export default function App() {
             <Layout>
               <ReplayPage />
             </Layout>
+          }
+        />
+        <Route
+          path="/app/ros/records"
+          element={
+            <div className="app-shell">
+              <main className="workspace">
+                <RosRecordsPage />
+              </main>
+            </div>
           }
         />
         <Route
