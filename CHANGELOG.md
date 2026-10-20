@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Download filtered ROS observations as CSV with original event identity, explicit units and spreadsheet-safe text.
+
 - Open saved ROS observation JSON offline, with bounded validation and session/robot/request filters.
 - Include an explicitly labeled fixture example; imported records do not connect to ROS or modify the fleet.
 

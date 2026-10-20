@@ -7,6 +7,7 @@ import {
   type ObservationRecord,
 } from '../ros/observations';
 import example from '../ros/example-observations.json';
+import { observationCsv } from '../ros/observationCsv';
 
 export default function RosRecordsPage() {
   const [record, setRecord] = useState<ObservationRecord | null>(null);
@@ -174,7 +175,25 @@ export default function RosRecordsPage() {
             </p>
           </section>
           <section className="panel">
-            <h2>Recorded events</h2>
+            <div className="panel-heading">
+              <h2>Recorded events</h2>
+              <button
+                className="secondary-button"
+                disabled={events.length === 0}
+                onClick={() => {
+                  const url = URL.createObjectURL(
+                    new Blob([observationCsv(events)], { type: 'text/csv;charset=utf-8' })
+                  );
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = 'nodeai-ros-filtered-observations.csv';
+                  link.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Download filtered CSV
+              </button>
+            </div>
             <p role="status">
               Showing {events.length} of {record.events.length} observations
             </p>
@@ -236,7 +255,9 @@ export default function RosRecordsPage() {
             )}
             <p className="field-help">
               This is a partial observation history, not a trajectory replay or an authoritative
-              account of robot state.
+              account of robot state. CSV downloads include only the filtered rows, with original
+              sequence numbers and source labels. Formula-like text is prefixed with an apostrophe
+              for spreadsheet use; the imported JSON is unchanged.
             </p>
           </section>
         </>

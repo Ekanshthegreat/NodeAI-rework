@@ -198,6 +198,15 @@ browser wall clock moved backward. **Load example** uses illustrative fixture
 events, not a physical robot run. Source labels describe the export's contents;
 the viewer does not authenticate the file or its origin.
 
+**Download filtered CSV** saves only the rows currently shown, preserving original
+sequence numbers, UTC receipt times, session/source labels and request IDs.
+Navigation fields include state, waypoint progress and remaining distance in
+metres; protocol errors leave robot/navigation fields empty. The button is
+disabled when no rows match. CSV text uses quoting for embedded commas/newlines,
+and formula-like text is prefixed with an apostrophe for spreadsheet use. This
+does not modify the original JSON. CSV files are inspection extracts, not a
+format the JSON viewer imports.
+
 This page does not initialize the simulation store, create a bridge client or
 send commands. It displays observations only, without reconstructing positions,
 inferring missing transitions or claiming the final state is still current.
