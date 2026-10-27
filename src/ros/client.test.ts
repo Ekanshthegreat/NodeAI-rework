@@ -19,6 +19,22 @@ class Socket implements SocketPort {
   }
 }
 const hello = { version: 1, type: 'hello', robots: ['agv1'] };
+const heartbeat = {
+  version: 1,
+  type: 'robots',
+  robots: [
+    {
+      id: 'agv1',
+      frame_id: 'map',
+      pose: null,
+      pose_age_seconds: null,
+      battery: null,
+      ready: false,
+      request_id: null,
+      state: 'idle',
+    },
+  ],
+};
 function setup() {
   const socket = new Socket(),
     receive = vi.fn(),
@@ -29,6 +45,75 @@ function setup() {
 }
 afterEach(() => vi.useRealTimers());
 describe('ROS bridge client', () => {
+  it('closes a handshaken connection that never supplies robot telemetry', async () => {
+    vi.useFakeTimers();
+    const { client, socket, connection, warning } = setup();
+    const connected = client.connect('ws://localhost:8765');
+    socket.message(hello);
+    await connected;
+    client.navigate('agv1', { x: 1, y: 2, yaw: 0 }, 'one');
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(socket.closed).toBe(true);
+    expect(connection).toHaveBeenLastCalledWith(false);
+    expect(warning).toHaveBeenLastCalledWith(expect.stringContaining('telemetry timed out'));
+    expect(socket.sent).toHaveLength(1); // no automatic cancel or replay
+    expect(() => client.cancel('agv1', 'one', 'cancel')).toThrow('not connected');
+  });
+  it('extends the telemetry deadline only after a valid robot snapshot', async () => {
+    vi.useFakeTimers();
+    const { client, socket } = setup();
+    const connected = client.connect('ws://localhost:8765');
+    socket.message(hello);
+    await connected;
+    await vi.advanceTimersByTimeAsync(9000);
+    socket.message(heartbeat);
+    await vi.advanceTimersByTimeAsync(9000);
+    expect(socket.closed).toBe(false);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(socket.closed).toBe(true);
+  });
+  it('does not let navigation, malformed telemetry or foreign robots mask a heartbeat failure', async () => {
+    vi.useFakeTimers();
+    const { client, socket } = setup();
+    const connected = client.connect('ws://localhost:8765');
+    socket.message(hello);
+    await connected;
+    await vi.advanceTimersByTimeAsync(9000);
+    socket.message({
+      version: 1,
+      type: 'navigation',
+      robot_id: 'agv1',
+      request_id: 'one',
+      state: 'running',
+      error: null,
+    });
+    socket.message({ ...heartbeat, robots: [{ ...heartbeat.robots[0], battery: 2 }] });
+    socket.message({ ...heartbeat, robots: [{ ...heartbeat.robots[0], id: 'foreign' }] });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(socket.closed).toBe(true);
+  });
+  it('clears old watchdogs on reconnect and explicit disconnect', async () => {
+    vi.useFakeTimers();
+    const first = new Socket(),
+      second = new Socket();
+    const factory = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const warning = vi.fn();
+    const client = new BridgeClient(vi.fn(), vi.fn(), warning, factory);
+    let connected = client.connect('ws://localhost:8765');
+    first.message(hello);
+    await connected;
+    await vi.advanceTimersByTimeAsync(9000);
+    connected = client.connect('ws://localhost:8766');
+    second.message(hello);
+    await connected;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(second.closed).toBe(false);
+    expect(warning).not.toHaveBeenCalled();
+    client.disconnect();
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(warning).not.toHaveBeenCalled();
+  });
   it('requires a versioned handshake before dispatch and validates targets', async () => {
     const { client, socket, receive } = setup();
     const connected = client.connect('ws://127.0.0.1:8765');

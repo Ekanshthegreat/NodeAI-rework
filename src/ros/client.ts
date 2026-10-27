@@ -128,6 +128,16 @@ export class BridgeClient {
         this.warning(message);
         this.disconnect();
       };
+      const awaitTelemetry = () => {
+        if (this.timer) clearTimeout(this.timer);
+        this.timer = setTimeout(
+          () =>
+            fail(
+              'ROS bridge telemetry timed out. Goals are not automatically cancelled or resubmitted.'
+            ),
+          10000
+        );
+      };
       this.timer = setTimeout(() => fail('Bridge handshake timed out'), 10000);
       socket.onopen = () => {};
       socket.onerror = () => fail('Unable to connect to the ROS bridge');
@@ -154,8 +164,7 @@ export class BridgeClient {
             this.handshake = true;
             this.waypointSupport = message.capabilities?.includes('waypoints') ?? false;
             this.rejectConnection = null;
-            if (this.timer) clearTimeout(this.timer);
-            this.timer = null;
+            awaitTelemetry();
             this.connection(true);
             resolve();
           }
@@ -165,6 +174,7 @@ export class BridgeClient {
               this.warning('Ignored a robot snapshot with duplicate or unadvertised robot IDs');
               return;
             }
+            awaitTelemetry();
           }
           if (
             this.handshake &&
