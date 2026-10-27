@@ -163,6 +163,15 @@ Inbound bridge messages above 64 KiB of UTF-8 text close the browser connection.
 This is separate from the server's 8 KiB incoming-command limit. Neither closure
 automatically cancels a goal on the robot.
 
+After the handshake, the browser requires a valid `robots` snapshot at least
+every ten seconds. If telemetry stops, the connection is closed and an explicit
+timeout warning is shown. Navigation feedback, protocol errors, malformed data
+and snapshots with foreign/duplicate IDs do not extend this deadline. The UI's
+shorter three-second freshness check still blocks stale dispatches first.
+Disconnect/reconnect clears the old watchdog. No command is retried, no goal is
+cancelled automatically, and no connection is restored automatically; reconnect
+explicitly and inspect the bridge's current assignment before acting.
+
 ## Export browser observations
 
 **Export observed events** downloads a version-1 JSON record of navigation and

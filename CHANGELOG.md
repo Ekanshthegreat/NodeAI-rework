@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Close browser bridge connections after ten seconds without valid robot telemetry, retaining explicit reconnect and action recovery.
+- Keep invalid snapshots and navigation-only traffic from masking a heartbeat failure; clear watchdogs on disconnect/reconnect.
+
 - Download filtered ROS observations as CSV with original event identity, explicit units and spreadsheet-safe text.
 
 - Open saved ROS observation JSON offline, with bounded validation and session/robot/request filters.
