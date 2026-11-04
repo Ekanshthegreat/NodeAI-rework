@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Validate live and imported waypoint progress through one shared schema; reject completed counts above the route length without refreshing telemetry freshness.
+
 - Close browser bridge connections after ten seconds without valid robot telemetry, retaining explicit reconnect and action recovery.
 - Keep invalid snapshots and navigation-only traffic from masking a heartbeat failure; clear watchdogs on disconnect/reconnect.
 

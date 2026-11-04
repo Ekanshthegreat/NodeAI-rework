@@ -172,6 +172,14 @@ Disconnect/reconnect clears the old watchdog. No command is retried, no goal is
 cancelled automatically, and no connection is restored automatically; reconnect
 explicitly and inspect the bridge's current assignment before acting.
 
+When both waypoint counters are present, completed waypoints cannot exceed the
+total. The same message validation applies to live robot snapshots, navigation
+feedback and offline imports. Invalid live messages are ignored, preserving the
+last valid state; invalid snapshots do not refresh the telemetry deadline.
+Older messages without counters remain supported, as do idle snapshots with
+zero completed and zero total. This checks consistency of one message and does
+not infer progress across missing events or requests.
+
 ## Export browser observations
 
 **Export observed events** downloads a version-1 JSON record of navigation and
