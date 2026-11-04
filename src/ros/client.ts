@@ -89,7 +89,7 @@ export class BridgeClient {
   private rejectConnection: ((error: Error) => void) | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private handshake = false;
-  private waypointSupport = false;
+  private capabilities = new Set<string>();
   private robotIds = new Set<string>();
   constructor(
     private receive: (message: BridgeMessage) => void,
@@ -176,7 +176,8 @@ export class BridgeClient {
             }
             this.robotIds = new Set(message.robots);
             this.handshake = true;
-            this.waypointSupport = message.capabilities?.includes('waypoints') ?? false;
+            // Version-1 bridges without capability metadata predate waypoint missions.
+            this.capabilities = new Set(message.capabilities ?? ['navigate', 'cancel']);
             this.rejectConnection = null;
             awaitTelemetry();
             this.connection(true);
@@ -207,6 +208,7 @@ export class BridgeClient {
   }
   navigate(robotId: string, target: z.infer<typeof Target>, requestId: string): void {
     this.requireRobot(robotId);
+    this.requireCapability('navigate');
     this.send({
       version: 1,
       type: 'navigate',
@@ -218,8 +220,7 @@ export class BridgeClient {
   waypoints(robotId: string, targets: z.infer<typeof WaypointTargets>, requestId: string): void {
     this.requireRobot(robotId);
     const validated = WaypointTargets.parse(targets);
-    if (!this.waypointSupport)
-      throw new Error('The connected bridge does not support waypoint missions');
+    this.requireCapability('waypoints');
     this.send({
       version: 1,
       type: 'waypoints',
@@ -230,6 +231,7 @@ export class BridgeClient {
   }
   cancel(robotId: string, targetRequestId: string, requestId: string): void {
     this.requireRobot(robotId);
+    this.requireCapability('cancel');
     this.send({
       version: 1,
       type: 'cancel',
@@ -237,6 +239,15 @@ export class BridgeClient {
       robot_id: id.parse(robotId),
       target_request_id: id.parse(targetRequestId),
     });
+  }
+  private requireCapability(capability: 'navigate' | 'waypoints' | 'cancel'): void {
+    const names = {
+      navigate: 'single-pose navigation',
+      waypoints: 'waypoint missions',
+      cancel: 'cancellation',
+    };
+    if (!this.capabilities.has(capability))
+      throw new Error(`The connected bridge does not support ${names[capability]}`);
   }
   private requireRobot(robotId: string): void {
     if (!this.handshake) throw new Error('ROS bridge is not connected');
@@ -255,7 +266,7 @@ export class BridgeClient {
     const socket = this.socket;
     this.socket = null;
     this.handshake = false;
-    this.waypointSupport = false;
+    this.capabilities.clear();
     this.robotIds.clear();
     if (socket) {
       socket.onopen = socket.onclose = socket.onerror = socket.onmessage = null;

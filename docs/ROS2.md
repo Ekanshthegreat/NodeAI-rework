@@ -146,6 +146,13 @@ The `hello` message advertises `capabilities: ["navigate", "waypoints", "cancel"
 The browser enables the route editor only when the bridge advertises waypoint
 support. Older version-1 bridges can still handle single-pose commands.
 
+The client enforces every advertised command capability before sending a request.
+An explicit empty list is read-only; a waypoint-only bridge cannot receive
+single-pose or cancel commands from this client. Legacy version-1 handshakes
+without a capability list retain navigation/cancellation support, but not
+waypoints. Capabilities are replaced on each reconnect, so an earlier bridge's
+permissions do not carry over. Unsupported calls fail locally with an error.
+
 Targets are metres and radians in the configured frame: finite X/Y values within
 ±10,000 and yaw within ±π. The server rejects unknown fields, robots, invalid
 IDs and unsupported commands. Messages are limited to 8 KiB; client and queue

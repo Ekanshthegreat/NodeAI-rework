@@ -45,6 +45,42 @@ function setup() {
 }
 afterEach(() => vi.useRealTimers());
 describe('ROS bridge client', () => {
+  it('enforces explicit capabilities for navigation and cancellation before sending', async () => {
+    const { client, socket } = setup();
+    const connected = client.connect('ws://localhost:8765');
+    socket.message({ ...hello, capabilities: ['waypoints'] });
+    await connected;
+    expect(() => client.navigate('agv1', { x: 1, y: 2, yaw: 0 }, 'one')).toThrow('single-pose');
+    expect(() => client.cancel('agv1', 'one', 'cancel')).toThrow('cancellation');
+    expect(socket.sent).toHaveLength(0);
+    client.waypoints('agv1', [{ x: 1, y: 2, yaw: 0 }], 'route');
+    expect(socket.sent).toHaveLength(1);
+    client.disconnect();
+  });
+  it('treats an empty capability list as read-only and resets it on reconnect', async () => {
+    const { client, socket } = setup();
+    let connected = client.connect('ws://localhost:8765');
+    socket.message({ ...hello, capabilities: [] });
+    await connected;
+    expect(() => client.navigate('agv1', { x: 1, y: 2, yaw: 0 }, 'one')).toThrow(
+      'does not support'
+    );
+    expect(() => client.cancel('agv1', 'one', 'cancel')).toThrow('does not support');
+    expect(() => client.waypoints('agv1', [{ x: 1, y: 2, yaw: 0 }], 'route')).toThrow(
+      'does not support'
+    );
+    expect(socket.sent).toHaveLength(0);
+    connected = client.connect('ws://localhost:8765');
+    socket.message(hello);
+    await connected;
+    client.navigate('agv1', { x: 1, y: 2, yaw: 0 }, 'two');
+    client.cancel('agv1', 'two', 'cancel-two');
+    expect(socket.sent).toHaveLength(2);
+    expect(() => client.waypoints('agv1', [{ x: 1, y: 2, yaw: 0 }], 'route')).toThrow(
+      'does not support'
+    );
+    client.disconnect();
+  });
   it('validates waypoint counts together in navigation and robot messages', () => {
     const navigation = {
       version: 1,

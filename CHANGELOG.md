@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Enforce navigation, waypoint and cancellation capabilities at the client boundary, including explicit read-only bridges and legacy handshake defaults.
+
 - Validate live and imported waypoint progress through one shared schema; reject completed counts above the route length without refreshing telemetry freshness.
 
 - Close browser bridge connections after ten seconds without valid robot telemetry, retaining explicit reconnect and action recovery.
