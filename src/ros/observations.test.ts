@@ -68,6 +68,10 @@ describe('offline ROS observations', () => {
       (record: ReturnType<typeof example>) => {
         record.events[0].message.distance_remaining = -1;
       },
+      (record: ReturnType<typeof example>) => {
+        record.events[0].message.completed_waypoints = 3;
+        record.events[0].message.total_waypoints = 2;
+      },
     ]) {
       const record = example();
       change(record);
@@ -90,10 +94,6 @@ describe('offline ROS observations', () => {
       },
       (record: ReturnType<typeof example>) => {
         record.dropped_events = 1;
-      },
-      (record: ReturnType<typeof example>) => {
-        record.events[0].message.completed_waypoints = 3;
-        record.events[0].message.total_waypoints = 2;
       },
     ]) {
       const record = example();

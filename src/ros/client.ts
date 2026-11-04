@@ -20,45 +20,59 @@ const navigationState = z.enum([
   'rejected',
   'failed',
 ]);
-const robot = z.object({
-  id,
-  frame_id: z.string(),
-  pose: Target.nullable(),
-  pose_age_seconds: finite.nonnegative().nullable(),
-  battery: finite.min(0).max(1).nullable(),
-  ready: z.boolean(),
-  request_id: id.nullable(),
-  state: z.union([navigationState, z.literal('idle')]),
-  completed_waypoints: z.number().int().min(0).max(20).optional(),
-  total_waypoints: z.number().int().min(0).max(20).optional(),
-});
-export const BridgeMessage = z.discriminatedUnion('type', [
-  z.object({
-    version: z.literal(1),
-    type: z.literal('hello'),
-    mode: z.enum(['ros', 'test_fixture']).optional(),
-    capabilities: z.array(z.enum(['navigate', 'waypoints', 'cancel'])).optional(),
-    robots: z.array(id).max(32),
-  }),
-  z.object({ version: z.literal(1), type: z.literal('robots'), robots: z.array(robot).max(32) }),
-  z.object({
-    version: z.literal(1),
-    type: z.literal('navigation'),
-    request_id: id,
-    robot_id: id,
-    state: navigationState,
-    error: z.string().nullable(),
-    completed_waypoints: z.number().int().min(0).max(20).optional(),
-    total_waypoints: z.number().int().min(1).max(20).optional(),
-    distance_remaining: finite.nonnegative().nullable().optional(),
-  }),
-  z.object({
-    version: z.literal(1),
-    type: z.literal('error'),
+function validProgress(value: { completed_waypoints?: number; total_waypoints?: number }): boolean {
+  return (
+    value.completed_waypoints === undefined ||
+    value.total_waypoints === undefined ||
+    value.completed_waypoints <= value.total_waypoints
+  );
+}
+const robot = z
+  .object({
+    id,
+    frame_id: z.string(),
+    pose: Target.nullable(),
+    pose_age_seconds: finite.nonnegative().nullable(),
+    battery: finite.min(0).max(1).nullable(),
+    ready: z.boolean(),
     request_id: id.nullable(),
-    message: z.string(),
-  }),
-]);
+    state: z.union([navigationState, z.literal('idle')]),
+    completed_waypoints: z.number().int().min(0).max(20).optional(),
+    total_waypoints: z.number().int().min(0).max(20).optional(),
+  })
+  .refine(validProgress, 'Completed waypoints exceed the route length');
+export const BridgeMessage = z
+  .discriminatedUnion('type', [
+    z.object({
+      version: z.literal(1),
+      type: z.literal('hello'),
+      mode: z.enum(['ros', 'test_fixture']).optional(),
+      capabilities: z.array(z.enum(['navigate', 'waypoints', 'cancel'])).optional(),
+      robots: z.array(id).max(32),
+    }),
+    z.object({ version: z.literal(1), type: z.literal('robots'), robots: z.array(robot).max(32) }),
+    z.object({
+      version: z.literal(1),
+      type: z.literal('navigation'),
+      request_id: id,
+      robot_id: id,
+      state: navigationState,
+      error: z.string().nullable(),
+      completed_waypoints: z.number().int().min(0).max(20).optional(),
+      total_waypoints: z.number().int().min(1).max(20).optional(),
+      distance_remaining: finite.nonnegative().nullable().optional(),
+    }),
+    z.object({
+      version: z.literal(1),
+      type: z.literal('error'),
+      request_id: id.nullable(),
+      message: z.string(),
+    }),
+  ])
+  .refine(
+    (message) => message.type !== 'navigation' || validProgress(message),
+    'Completed waypoints exceed the route length'
+  );
 export type BridgeMessage = z.infer<typeof BridgeMessage>;
 export type RosRobot = z.infer<typeof robot>;
 export interface SocketPort {

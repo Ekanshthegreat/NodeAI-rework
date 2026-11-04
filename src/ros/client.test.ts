@@ -45,6 +45,61 @@ function setup() {
 }
 afterEach(() => vi.useRealTimers());
 describe('ROS bridge client', () => {
+  it('validates waypoint counts together in navigation and robot messages', () => {
+    const navigation = {
+      version: 1,
+      type: 'navigation',
+      request_id: 'route',
+      robot_id: 'agv1',
+      state: 'running',
+      error: null,
+      completed_waypoints: 3,
+      total_waypoints: 2,
+    };
+    expect(BridgeMessage.safeParse(navigation).success).toBe(false);
+    expect(BridgeMessage.safeParse({ ...navigation, completed_waypoints: 2 }).success).toBe(true);
+    expect(
+      BridgeMessage.safeParse({
+        ...heartbeat,
+        robots: [{ ...heartbeat.robots[0], completed_waypoints: 1, total_waypoints: 0 }],
+      }).success
+    ).toBe(false);
+    expect(
+      BridgeMessage.safeParse({
+        ...heartbeat,
+        robots: [{ ...heartbeat.robots[0], completed_waypoints: 0, total_waypoints: 0 }],
+      }).success
+    ).toBe(true);
+    expect(BridgeMessage.safeParse(heartbeat).success).toBe(true);
+  });
+  it('keeps the last valid state and telemetry deadline after impossible progress', async () => {
+    vi.useFakeTimers();
+    const { client, socket, receive } = setup();
+    const connected = client.connect('ws://localhost:8765');
+    socket.message(hello);
+    await connected;
+    socket.message(heartbeat);
+    await vi.advanceTimersByTimeAsync(9000);
+    socket.message({
+      ...heartbeat,
+      robots: [{ ...heartbeat.robots[0], completed_waypoints: 3, total_waypoints: 2 }],
+    });
+    socket.message({
+      version: 1,
+      type: 'navigation',
+      request_id: 'route',
+      robot_id: 'agv1',
+      state: 'succeeded',
+      error: null,
+      completed_waypoints: 3,
+      total_waypoints: 2,
+    });
+    expect(receive).toHaveBeenCalledTimes(2);
+    expect(receive).toHaveBeenLastCalledWith(heartbeat);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(socket.closed).toBe(true);
+    client.disconnect();
+  });
   it('closes a handshaken connection that never supplies robot telemetry', async () => {
     vi.useFakeTimers();
     const { client, socket, connection, warning } = setup();

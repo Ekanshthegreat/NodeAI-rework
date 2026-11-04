@@ -53,13 +53,6 @@ export function parseObservations(text: string): ObservationRecord {
       (sources.has(event.bridge_session) && sources.get(event.bridge_session) !== event.source)
     )
       throw new Error('Observation sequences or bridge-session labels are inconsistent.');
-    const message = event.message;
-    if (
-      message.type === 'navigation' &&
-      message.total_waypoints !== undefined &&
-      (message.completed_waypoints ?? 0) > message.total_waypoints
-    )
-      throw new Error('Observation waypoint progress is inconsistent.');
     sequence = event.sequence;
     session = event.bridge_session;
     sources.set(session, event.source);
