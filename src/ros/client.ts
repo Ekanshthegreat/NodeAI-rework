@@ -1,4 +1,5 @@
 import { z } from 'zod';
+export const BRIDGE_MESSAGE_LIMIT = 64 * 1024;
 const finite = z.number().finite();
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 export const Target = z
@@ -163,7 +164,10 @@ export class BridgeClient {
         fail('ROS bridge disconnected. Goals are not automatically cancelled or resubmitted.');
       socket.onmessage = (event) => {
         if (this.socket !== socket) return;
-        if (event.data.length > 65536 || new TextEncoder().encode(event.data).byteLength > 65536) {
+        if (
+          event.data.length > BRIDGE_MESSAGE_LIMIT ||
+          new TextEncoder().encode(event.data).byteLength > BRIDGE_MESSAGE_LIMIT
+        ) {
           fail('ROS bridge message exceeds the 64 KiB limit');
           return;
         }

@@ -108,6 +108,16 @@ describe('offline ROS observations', () => {
     record.dropped_events = 1;
     expect(parseObservations(JSON.stringify(record)).events).toHaveLength(2);
   });
+  it('applies the live message byte limit to imported events, including unknown fields', () => {
+    const record = example();
+    record.events[1].message.message = 'a'.repeat(40000);
+    expect(parseObservations(JSON.stringify(record)).events).toHaveLength(3);
+    record.events[1].message.message = '界'.repeat(22000);
+    expect(() => parseObservations(JSON.stringify(record))).toThrow('version-1');
+    record.events[1].message.message = 'small';
+    record.events[1].message.extra = 'x'.repeat(65536);
+    expect(() => parseObservations(JSON.stringify(record))).toThrow('version-1');
+  });
   it('bounds UTF-8 file size and event count before displaying records', () => {
     expect(() => parseObservations(' '.repeat(OBSERVATION_FILE_LIMIT + 1))).toThrow('2 MiB');
     expect(() => parseObservations('界'.repeat(OBSERVATION_FILE_LIMIT / 2))).toThrow('2 MiB');

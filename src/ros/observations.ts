@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BridgeMessage } from './client';
+import { BridgeMessage, BRIDGE_MESSAGE_LIMIT } from './client';
 import { JOURNAL_LIMIT, type JournalEvent } from './journal';
 
 export const OBSERVATION_FILE_LIMIT = 2 * 1024 * 1024;
@@ -20,10 +20,23 @@ const recordSchema = z.object({
         received_at: timestamp,
         source: z.enum(['ros', 'test_fixture']),
         bridge_session: counter.min(1),
-        message: BridgeMessage.refine(
-          (message): message is JournalEvent =>
-            message.type === 'navigation' || message.type === 'error'
-        ),
+        message: z
+          .unknown()
+          .superRefine((message, context) => {
+            // Inspect the input before Zod strips unknown protocol fields.
+            const text = JSON.stringify(message);
+            if (text && new TextEncoder().encode(text).byteLength > BRIDGE_MESSAGE_LIMIT)
+              context.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Bridge message exceeds 64 KiB',
+              });
+          })
+          .pipe(
+            BridgeMessage.refine(
+              (message): message is JournalEvent =>
+                message.type === 'navigation' || message.type === 'error'
+            )
+          ),
       })
     )
     .max(JOURNAL_LIMIT),

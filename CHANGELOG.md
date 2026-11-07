@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Require full robot rosters for heartbeats and reflect bridge capabilities in mission controls.
+- Enforce the live per-message UTF-8 limit when importing offline observations.
+
 - Enforce navigation, waypoint and cancellation capabilities at the client boundary, including explicit read-only bridges and legacy handshake defaults.
 
 - Validate live and imported waypoint progress through one shared schema; reject completed counts above the route length without refreshing telemetry freshness.

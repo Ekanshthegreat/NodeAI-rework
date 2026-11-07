@@ -283,3 +283,7 @@ ordering is immaterial. Changing the roster requires a new connection.
 Mission controls use the same capability defaults as the client. Unsupported
 mission types and cancellation are disabled; a waypoint-only bridge selects
 the route editor on connection. Disconnect clears all command availability.
+
+Offline imports also enforce the live 64 KiB UTF-8 limit on each embedded
+message, before unknown fields are stripped. The whole file remains limited to
+2 MiB. This checks protocol compatibility, not the authenticity of a record.
