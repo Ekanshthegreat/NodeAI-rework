@@ -45,6 +45,23 @@ function setup() {
 }
 afterEach(() => vi.useRealTimers());
 describe('ROS bridge client', () => {
+  it('requires the full roster before refreshing telemetry, regardless of order', async () => {
+    vi.useFakeTimers();
+    const { client, socket, receive } = setup();
+    const connected = client.connect('ws://localhost:8765');
+    socket.message({ ...hello, robots: ['agv1', 'agv2'] });
+    await connected;
+    const second = { ...heartbeat.robots[0], id: 'agv2' };
+    await vi.advanceTimersByTimeAsync(9000);
+    socket.message({ ...heartbeat, robots: [second, heartbeat.robots[0]] });
+    expect(receive).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(9000);
+    socket.message(heartbeat);
+    socket.message({ ...heartbeat, robots: [] });
+    expect(receive).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(socket.closed).toBe(true);
+  });
   it('enforces explicit capabilities for navigation and cancellation before sending', async () => {
     const { client, socket } = setup();
     const connected = client.connect('ws://localhost:8765');

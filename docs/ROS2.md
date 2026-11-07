@@ -163,7 +163,7 @@ heartbeats reconcile current assignment rather than inventing a terminal result.
 The browser accepts one `hello` per connection, with unique robot IDs. A second
 handshake closes the connection rather than changing its source mode or robot
 identity in place. Reconnect explicitly after a bridge restart or roster change.
-Commands are restricted to the advertised robots; snapshots with duplicate or
+Commands are restricted to the advertised robots; snapshots missing any advertised robot or containing duplicate or
 unadvertised IDs and navigation feedback for other robots are ignored. An invalid
 snapshot does not refresh the heartbeat, so stale dispatch protection still applies.
 Inbound bridge messages above 64 KiB of UTF-8 text close the browser connection.
@@ -275,3 +275,7 @@ remains loopback-only. Ordinary ROS mode requires a loopback listener.
 - [BatteryState message](https://github.com/ros2/common_interfaces/blob/jazzy/sensor_msgs/msg/BatteryState.msg)
 
 ![ROS navigation page connected to the action test fixture](images/ros-waypoints.png)
+
+A heartbeat is a full roster snapshot, including robots without localization.
+Partial or empty snapshots cannot keep a nonempty advertised fleet alive; robot
+ordering is immaterial. Changing the roster requires a new connection.

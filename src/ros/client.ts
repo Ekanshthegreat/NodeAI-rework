@@ -185,8 +185,14 @@ export class BridgeClient {
           }
           if (this.handshake && message.type === 'robots') {
             const ids = message.robots.map((robot) => robot.id);
-            if (new Set(ids).size !== ids.length || ids.some((id) => !this.robotIds.has(id))) {
-              this.warning('Ignored a robot snapshot with duplicate or unadvertised robot IDs');
+            if (
+              ids.length !== this.robotIds.size ||
+              new Set(ids).size !== ids.length ||
+              ids.some((id) => !this.robotIds.has(id))
+            ) {
+              this.warning(
+                'Ignored a robot snapshot with missing, duplicate or unadvertised robot IDs'
+              );
               return;
             }
             awaitTelemetry();
