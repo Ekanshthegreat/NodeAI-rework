@@ -279,3 +279,7 @@ remains loopback-only. Ordinary ROS mode requires a loopback listener.
 A heartbeat is a full roster snapshot, including robots without localization.
 Partial or empty snapshots cannot keep a nonempty advertised fleet alive; robot
 ordering is immaterial. Changing the roster requires a new connection.
+
+Mission controls use the same capability defaults as the client. Unsupported
+mission types and cancellation are disabled; a waypoint-only bridge selects
+the route editor on connection. Disconnect clears all command availability.

@@ -74,6 +74,10 @@ export const BridgeMessage = z
     'Completed waypoints exceed the route length'
   );
 export type BridgeMessage = z.infer<typeof BridgeMessage>;
+export function commandCapabilities(message: Extract<BridgeMessage, { type: 'hello' }>) {
+  // Version-1 bridges without metadata predate waypoint missions.
+  return new Set(message.capabilities ?? ['navigate', 'cancel']);
+}
 export type RosRobot = z.infer<typeof robot>;
 export interface SocketPort {
   readyState: number;
@@ -176,8 +180,7 @@ export class BridgeClient {
             }
             this.robotIds = new Set(message.robots);
             this.handshake = true;
-            // Version-1 bridges without capability metadata predate waypoint missions.
-            this.capabilities = new Set(message.capabilities ?? ['navigate', 'cancel']);
+            this.capabilities = commandCapabilities(message);
             this.rejectConnection = null;
             awaitTelemetry();
             this.connection(true);

@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BridgeClient, type BridgeMessage, type RosRobot } from '../ros/client';
+import {
+  BridgeClient,
+  commandCapabilities,
+  type BridgeMessage,
+  type RosRobot,
+} from '../ros/client';
 import { createJournal, observeEvent, exportJournal } from '../ros/journal';
 export default function RosPage() {
   const [address, setAddress] = useState('ws://127.0.0.1:8765');
@@ -19,7 +24,7 @@ export default function RosPage() {
     { x: '1', y: '2', yaw: '0' },
     { x: '3', y: '4', yaw: '0' },
   ]);
-  const [waypointSupport, setWaypointSupport] = useState(false);
+  const [capabilities, setCapabilities] = useState<ReadonlySet<string>>(new Set());
   const [mode, setMode] = useState<'ros' | 'test_fixture'>('ros');
   const [journal, setJournal] = useState(createJournal);
   const bridgeSession = useRef(0);
@@ -32,7 +37,11 @@ export default function RosPage() {
           setMode(message.mode ?? 'ros');
           modeRef.current = message.mode ?? 'ros';
           bridgeSession.current += 1;
-          setWaypointSupport(message.capabilities?.includes('waypoints') ?? false);
+          const supported = commandCapabilities(message);
+          setCapabilities(supported);
+          setMissionType(
+            supported.has('waypoints') && !supported.has('navigate') ? 'waypoints' : 'navigate'
+          );
         }
         if (message.type === 'robots') {
           setRobots(message.robots);
@@ -77,6 +86,7 @@ export default function RosPage() {
       (active) => {
         setConnected(active);
         if (!active) {
+          setCapabilities(new Set());
           setRobots([]);
           setPending({});
         }
@@ -238,8 +248,10 @@ export default function RosPage() {
               value={missionType}
               onChange={(event) => setMissionType(event.target.value as 'navigate' | 'waypoints')}
             >
-              <option value="navigate">Single pose</option>
-              <option value="waypoints" disabled={!waypointSupport}>
+              <option value="navigate" disabled={!capabilities.has('navigate')}>
+                Single pose
+              </option>
+              <option value="waypoints" disabled={!capabilities.has('waypoints')}>
                 Waypoint route
               </option>
             </select>
@@ -310,7 +322,9 @@ export default function RosPage() {
             <button
               className="primary-button"
               type="submit"
-              disabled={!fresh || !robot?.ready || Boolean(activeRequest)}
+              disabled={
+                !fresh || !robot?.ready || Boolean(activeRequest) || !capabilities.has(missionType)
+              }
             >
               {missionType === 'waypoints' ? 'Send waypoint mission' : 'Send Nav2 goal'}
             </button>
@@ -320,7 +334,7 @@ export default function RosPage() {
               <p className="field-help">Goal {activeRequest}</p>
               <button
                 className="secondary-button"
-                disabled={!connected}
+                disabled={!connected || !capabilities.has('cancel')}
                 onClick={() => {
                   try {
                     client.current?.cancel(selected, activeRequest, crypto.randomUUID());
