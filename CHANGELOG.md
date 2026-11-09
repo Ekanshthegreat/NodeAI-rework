@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Validate WebSocket input before queueing; isolate malformed-message errors by request.
+- Add bounded SQLite event history with read-only JSONL export.
+- Expose loopback health/Prometheus metrics and test bridge utilities without ROS.
+
 - Require full robot rosters for heartbeats and reflect bridge capabilities in mission controls.
 - Enforce the live per-message UTF-8 limit when importing offline observations.
 
