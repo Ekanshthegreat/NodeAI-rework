@@ -50,3 +50,28 @@ def test_incomplete_snapshot_cannot_claim_a_persisted_mission(client, operator, 
         run_once(client, 'worker-test-token', 'worker1', 'ws://fixture', socket_factory=lambda *a, **kw: bridge)
     assert bridge.sent == []
     assert claim(client, worker).status_code == 200
+
+
+def test_regular_robot_telemetry_does_not_starve_worker_lease_renewal(client, operator, monkeypatch):
+    submit(client, operator)
+    now = [0.0]
+    bridge = Bridge()
+    original_send, original_recv = bridge.send, bridge.recv
+    def send(text):
+        original_send(text)
+        bridge.messages[0:0] = [dict(version=1, type='robots', robots=[]) for _ in range(12)]
+    def recv(timeout):
+        now[0] += 1
+        return original_recv(timeout)
+    bridge.send, bridge.recv = send, recv
+    original_post = client.post
+    renewed = []
+    def post(url, **kwargs):
+        if url.endswith('/heartbeat'): renewed.append(url)
+        return original_post(url, **kwargs)
+    monkeypatch.setattr(client, 'post', post)
+    result = run_once(client, 'worker-test-token', 'worker1', 'ws://fixture',
+                      socket_factory=lambda *a, **kw: bridge, clock=lambda: now[0])
+    assert result['state'] == 'succeeded'
+    assert len(renewed) >= 2
+    assert len(bridge.sent) == 1

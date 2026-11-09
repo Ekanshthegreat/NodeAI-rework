@@ -10,7 +10,7 @@ from websockets.exceptions import WebSocketException
 TERMINAL = {'succeeded', 'cancelled', 'rejected', 'failed'}
 
 
-def run_once(client, worker_token, worker_id, bridge_url, socket_factory=connect, deadline_seconds=150):
+def run_once(client, worker_token, worker_id, bridge_url, socket_factory=connect, deadline_seconds=150, clock=time.monotonic):
     headers = {'Authorization': 'Bearer ' + worker_token}
     with socket_factory(bridge_url, origin='http://localhost:5173', open_timeout=3, max_size=65536) as socket:
         def read(timeout):
@@ -41,7 +41,7 @@ def run_once(client, worker_token, worker_id, bridge_url, socket_factory=connect
         ready = [robot['id'] for robot in robots if robot.get('ready') is True
                  and robot.get('request_id') is None and robot.get('state') == 'idle']
         if not ready: return None
-        fresh_at = time.monotonic()
+        fresh_at = clock()
         response = client.post('/worker/claim', headers=headers, json={'worker_id': worker_id, 'robot_ids': ready})
         response.raise_for_status()
         if response.status_code == 204: return None
@@ -56,7 +56,7 @@ def run_once(client, worker_token, worker_id, bridge_url, socket_factory=connect
             targets = mission['request']['targets']
             if len(targets) > 1 and 'waypoints' not in capabilities:
                 return report('rejected', 'Bridge does not support waypoint missions')
-            if time.monotonic() - fresh_at >= 3:
+            if clock() - fresh_at >= 3:
                 return report('unknown', 'Readiness snapshot expired after claim; nothing was sent')
             command = dict(version=1, robot_id=mission['robot_id'], request_id=mission['dispatch_token'])
             if len(targets) == 1 and 'navigate' in capabilities:
@@ -64,14 +64,16 @@ def run_once(client, worker_token, worker_id, bridge_url, socket_factory=connect
             else: command.update(type='waypoints', targets=targets)
             # No automatic retry: delivery may have succeeded even when send/recv fails.
             socket.send(json.dumps(command, allow_nan=False))
-            until = time.monotonic() + deadline_seconds
-            while time.monotonic() < until:
-                try: message = read(min(5, max(.01, until-time.monotonic())))
-                except TimeoutError:
+            until = clock() + deadline_seconds
+            next_heartbeat = clock() + 5
+            while clock() < until:
+                if clock() >= next_heartbeat:
                     response = client.post(f"/worker/{mission['id']}/heartbeat", headers=headers, json=ownership)
                     response.raise_for_status()
                     if response.json()['state'] == 'unknown': return report('unknown', 'Worker lease expired')
-                    continue
+                    next_heartbeat = clock() + 5
+                try: message = read(min(5, max(.01, until-clock()), max(.01, next_heartbeat-clock())))
+                except TimeoutError: continue
                 if message.get('request_id') != mission['dispatch_token']: continue
                 if message.get('type') == 'error': return report('rejected', message.get('message', 'Bridge rejected request'))
                 if message.get('type') != 'navigation' or message.get('robot_id') != mission['robot_id']: continue
