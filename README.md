@@ -6,7 +6,7 @@ A robot mission console with a browser simulator and a ROS 2 Jazzy / Nav2 bridge
 
 [Browser demo](https://ekanshthegreat.github.io/NodeAI-rework/) ·
 [Architecture](docs/ARCHITECTURE.md) · [ROS setup](docs/ROS2.md) ·
-[Operations](docs/OPERATIONS.md) · [Demo guide](docs/DEMO.md)
+[Persistent missions](docs/MISSIONS.md) · [Operations](docs/OPERATIONS.md) · [Demo guide](docs/DEMO.md)
 
 ![Mission control](docs/images/mission-control.png)
 
@@ -29,6 +29,10 @@ Commands use a small grammar; unsupported instructions fail before dispatch.
 flowchart LR
   Browser[React console] --> Sim[TypeScript fleet engine]
   Sim --> Replay[Browser snapshots and replay]
+  APIClient[HTTP client] --> API[FastAPI mission service]
+  API --> DB[PostgreSQL mission state]
+  Worker[Dispatch worker] --> API
+  Worker --> WS
   Browser --> WS[Validated WebSocket commands]
   WS --> Queue[Bounded command queue]
   Queue --> ROS[ROS gateway and Nav2 actions]
@@ -59,6 +63,10 @@ curl http://127.0.0.1:8766/metrics
 ```
 
 [Operations](docs/OPERATIONS.md) covers audit export, degraded health and restarts.
+
+For persisted submissions and restart reconciliation, run the
+[mission service](docs/MISSIONS.md) with `docker compose --profile demo up --build`.
+Its separate worker dispatches through the same ROS bridge.
 
 ## Check changes
 

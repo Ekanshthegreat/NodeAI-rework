@@ -1,0 +1,41 @@
+{
+  "source": "Docker Compose with real ROS 2 action test fixture; no robot hardware",
+  "mission": {
+    "id": "97cd1fde-ae44-4ddf-b9aa-c7c22d52223a",
+    "robot_id": "agv1",
+    "state": "succeeded",
+    "version": 4
+  },
+  "idempotent_submission_verified": true,
+  "events": [
+    {
+      "sequence": 9,
+      "state": "queued",
+      "version": 1,
+      "detail": "Mission accepted",
+      "recorded_at": "2026-11-09T08:55:04.040855+00:00"
+    },
+    {
+      "sequence": 10,
+      "state": "dispatching",
+      "version": 2,
+      "detail": "Worker claimed mission",
+      "recorded_at": "2026-11-09T08:55:05.379177+00:00"
+    },
+    {
+      "sequence": 11,
+      "state": "running",
+      "version": 3,
+      "detail": "Bridge reported accepted",
+      "recorded_at": "2026-11-09T08:55:05.423152+00:00"
+    },
+    {
+      "sequence": 12,
+      "state": "succeeded",
+      "version": 4,
+      "detail": "succeeded",
+      "recorded_at": "2026-11-09T08:55:11.678899+00:00"
+    }
+  ],
+  "api_restart_read_verified": true
+}

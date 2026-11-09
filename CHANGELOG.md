@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add a PostgreSQL-backed mission API with Alembic migrations, idempotent submission and exclusive worker claims.
+- Dispatch through a separate ROS worker; hold expired/uncertain missions for explicit reconciliation.
+- Run the API, database, worker and ROS action fixture with Compose and verify the full path in CI.
+
 - Validate WebSocket input before queueing; isolate malformed-message errors by request.
 - Add bounded SQLite event history with read-only JSONL export.
 - Expose loopback health/Prometheus metrics and test bridge utilities without ROS.
