@@ -293,3 +293,15 @@ def test_real_cancelled_route_does_not_send_next_goal(bridge):
     )
     wait_for(lambda: state(events, "cancel-route", "cancelled"))
     assert [pose.pose.position.x for pose in observed] == [3]
+
+
+def test_diagnostics_track_ros_heartbeat_and_processed_commands(bridge):
+    node, events, _ = bridge
+    wait_for(lambda: node.last_heartbeat is not None)
+    diagnostics = node.diagnostics()
+    assert 0 <= diagnostics['heartbeat_age_seconds'] < 2
+    assert diagnostics['ready_robots'] == 1
+    before = diagnostics['commands_processed']
+    node.commands.put(request('diagnostics', 1))
+    wait_for(lambda: node.diagnostics()['commands_processed'] > before)
+    wait_for(lambda: any(e.get('request_id') == 'diagnostics' and e.get('state') == 'succeeded' for e in events))

@@ -23,6 +23,7 @@ from websockets.exceptions import ConnectionClosed
 from nodeai_bridge.gateway import Gateway, identifier
 from nodeai_bridge.transport import enqueue
 from nodeai_bridge.audit import AuditLog
+from nodeai_bridge.health import start_health
 
 
 class NavigationPort:
@@ -135,6 +136,11 @@ class BridgeNode(Node):
         audit_path = settings.get('audit_path')
         self.audit = AuditLog(audit_path) if audit_path else None
         self.audit_errors = 0
+        self.output_drops = 0
+        self.commands_processed = 0
+        self.commands_rejected = 0
+        self.health_snapshot = {}
+        self.last_heartbeat = None
         self.emit = emit or self.publish_event
         self.ports = {}
         for robot in settings["robots"]:
@@ -164,6 +170,7 @@ class BridgeNode(Node):
         try:
             self.outgoing.put_nowait(event)
         except Full:
+            self.output_drops += 1
             # A stalled transport must not block ROS callbacks. Heartbeats expose
             # current assignment after reconnect; log overflow rather than fabricate success.
             self.get_logger().error(
@@ -176,9 +183,14 @@ class BridgeNode(Node):
                 data = self.commands.get_nowait()
             except Empty:
                 break
+            self.commands_processed += 1
             self.record('command', data)
             self.gateway.receive(data)
         self.gateway.poll()
+
+    def diagnostics(self):
+        age = None if self.last_heartbeat is None else time.monotonic() - self.last_heartbeat
+        return {**self.health_snapshot, 'heartbeat_age_seconds': age}
 
     def heartbeat(self):
         robots = []
@@ -203,6 +215,17 @@ class BridgeNode(Node):
                     else 0,
                 }
             )
+        self.last_heartbeat = time.monotonic()
+        self.health_snapshot = {
+            'audit_enabled': self.audit is not None,
+            'audit_errors': self.audit_errors,
+            'output_drops': self.output_drops,
+            'commands_processed': self.commands_processed,
+            'commands_rejected': self.commands_rejected,
+            'command_queue_depth': self.commands.qsize(),
+            'active_goals': len(self.gateway.active),
+            'ready_robots': sum(robot['ready'] for robot in robots),
+        }
         self.emit({"version": 1, "type": "robots", "robots": robots})
 
 
@@ -249,6 +272,7 @@ async def socket_server(node):
             async for raw in socket:
                 error = enqueue(raw, node.commands)
                 if error is not None:
+                    node.commands_rejected += 1
                     await socket.send(json.dumps(error))
         except ConnectionClosed:
             pass
@@ -276,7 +300,17 @@ async def socket_server(node):
 
     async with serve(handler, host, port, origins=origins, max_size=8192, max_queue=16):
         node.get_logger().info(f"NodeAI bridge on ws://{host}:{port}")
-        await broadcast()
+        health = None
+        health_port = node.settings.get('health_port')
+        if health_port is not None:
+            # Container fixture forwarding never exposes diagnostics off-loopback.
+            health = await start_health('127.0.0.1', health_port, node.diagnostics)
+        try:
+            await broadcast()
+        finally:
+            if health is not None:
+                health.close()
+                await health.wait_closed()
 
 
 def main():

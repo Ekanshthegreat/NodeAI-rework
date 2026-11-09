@@ -15,6 +15,16 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check the bridge without ROS
+        env:
+          PYTHONPATH: ros2/nodeai_bridge
+        run: |
+          for suite in gateway transport audit health; do
+            python3 -m unittest discover -s ros2/nodeai_bridge/test -p "test_${suite}.py"
+          done
       - run: npm ci
       - run: npm run format:check
       - run: npm run lint
