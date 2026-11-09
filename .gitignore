@@ -35,3 +35,8 @@ __pycache__/
 ros2/build/
 ros2/install/
 ros2/log/
+
+# Local bridge audit databases
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm

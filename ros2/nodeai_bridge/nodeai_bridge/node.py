@@ -22,6 +22,7 @@ from websockets.exceptions import ConnectionClosed
 
 from nodeai_bridge.gateway import Gateway, identifier
 from nodeai_bridge.transport import enqueue
+from nodeai_bridge.audit import AuditLog
 
 
 class NavigationPort:
@@ -131,6 +132,9 @@ class BridgeNode(Node):
         ):
             raise ValueError("Configure 1–32 robots")
         self.commands, self.outgoing = Queue(maxsize=200), Queue(maxsize=2000)
+        audit_path = settings.get('audit_path')
+        self.audit = AuditLog(audit_path) if audit_path else None
+        self.audit_errors = 0
         self.emit = emit or self.publish_event
         self.ports = {}
         for robot in settings["robots"]:
@@ -146,7 +150,17 @@ class BridgeNode(Node):
         self.create_timer(0.02, self.process_commands, clock=self.transport_clock)
         self.create_timer(0.5, self.heartbeat, clock=self.transport_clock)
 
+    def record(self, kind, data):
+        if self.audit is not None:
+            try:
+                self.audit.append(kind, data)
+            except Exception as error:
+                self.audit_errors += 1
+                self.get_logger().error(f'Audit write failed: {error}')
+
     def publish_event(self, event):
+        if event['type'] in {'navigation', 'error'}:
+            self.record(event['type'], event)
         try:
             self.outgoing.put_nowait(event)
         except Full:
@@ -162,6 +176,7 @@ class BridgeNode(Node):
                 data = self.commands.get_nowait()
             except Empty:
                 break
+            self.record('command', data)
             self.gateway.receive(data)
         self.gateway.poll()
 
@@ -277,4 +292,6 @@ def main():
         if rclpy.ok():
             rclpy.shutdown()
         thread.join(timeout=3)
+        if node.audit is not None:
+            node.audit.close()
         node.destroy_node()
