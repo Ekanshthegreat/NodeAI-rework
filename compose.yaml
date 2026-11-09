@@ -1,0 +1,58 @@
+name: nodeai-missions
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: nodeai
+      POSTGRES_PASSWORD: ${NODEAI_DB_PASSWORD:-nodeai-local-only}
+      POSTGRES_DB: nodeai
+    volumes:
+      - mission-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U nodeai -d nodeai']
+      interval: 2s
+      timeout: 2s
+      retries: 20
+  api:
+    build:
+      context: .
+      dockerfile: services/mission_api/Dockerfile
+    environment:
+      NODEAI_DATABASE_URL: postgresql+psycopg://nodeai:${NODEAI_DB_PASSWORD:-nodeai-local-only}@db/nodeai
+      NODEAI_API_TOKEN: ${NODEAI_API_TOKEN:-operator-local-development}
+      NODEAI_WORKER_TOKEN: ${NODEAI_WORKER_TOKEN:-worker-local-development}
+    command: [sh, -c, 'alembic upgrade head && uvicorn nodeai_missions.api:application --factory --host 0.0.0.0 --port 8000 --limit-concurrency 100']
+    ports:
+      - '127.0.0.1:${NODEAI_API_PORT:-8000}:8000'
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/healthz", timeout=2)']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  ros-fixture:
+    profiles: [demo]
+    build:
+      context: .
+      dockerfile: services/mission_api/fixture.Dockerfile
+  worker:
+    profiles: [demo]
+    build:
+      context: .
+      dockerfile: services/mission_api/Dockerfile
+    environment:
+      NODEAI_API_URL: http://api:8000
+      NODEAI_WORKER_TOKEN: ${NODEAI_WORKER_TOKEN:-worker-local-development}
+      NODEAI_WORKER_ID: fixture-worker
+      NODEAI_BRIDGE_URL: ws://ros-fixture:8765
+    command: [python, -m, nodeai_missions.worker]
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      ros-fixture:
+        condition: service_started
+volumes:
+  mission-data:

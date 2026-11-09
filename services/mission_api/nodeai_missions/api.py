@@ -8,6 +8,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt
 from sqlalchemy.exc import SQLAlchemyError
 from .store import Conflict, Missing, Store
+from .boundary import BoundedJSONBody
 
 ID = Annotated[str, Field(pattern=r'^[A-Za-z0-9_-]{1,64}$')]
 Number = StrictFloat | StrictInt
@@ -60,9 +61,10 @@ def create_app(database_url, api_token, worker_token):
         store.engine.dispose()
     app = FastAPI(title='NodeAI mission service', lifespan=lifespan)
     app.state.store = store
+    app.add_middleware(BoundedJSONBody)
     def auth(expected):
         def check(authorization: Annotated[str | None, Header()] = None):
-            if authorization is None or not secrets.compare_digest(authorization, 'Bearer ' + expected):
+            if authorization is None or not secrets.compare_digest(authorization.encode('utf-8'), ('Bearer ' + expected).encode('utf-8')):
                 raise HTTPException(401, 'Invalid credentials')
         return check
     operator = Depends(auth(api_token))

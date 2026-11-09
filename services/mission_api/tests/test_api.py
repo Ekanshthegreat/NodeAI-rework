@@ -111,3 +111,23 @@ def test_lifecycle_events_are_transactional_and_cursor_paginated(client, operato
     assert [row['state'] for row in first+rest] == ['queued', 'dispatching', 'running', 'succeeded']
     assert [row['version'] for row in first+rest] == [1, 2, 3, 4]
     assert client.get(endpoint+'?limit=1000', headers=operator).status_code == 422
+
+
+def test_oversized_duplicate_and_nonfinite_json_never_reach_storage(client, operator):
+    headers = {**operator, 'Idempotency-Key': 'bad-json', 'Content-Type': 'application/json'}
+    for body in ['{"robot_id":"agv1","robot_id":"agv2"}', '{"x":NaN}', '[' * 2000 + ']' * 2000]:
+        assert client.post('/missions', headers=headers, content=body).status_code == 400
+    assert client.post('/missions', headers=headers, content='x'*16385).status_code == 413
+    def chunks():
+        for _ in range(17): yield b'x'*1024
+    assert client.post('/missions', headers=headers, content=chunks()).status_code == 413
+    assert submit(client, operator).status_code == 201
+
+
+def test_migration_schema_matches_models(client, app):
+    from alembic.autogenerate import compare_metadata
+    from alembic.migration import MigrationContext
+    from nodeai_missions.models import Base
+    with app.state.store.engine.connect() as connection:
+        changes = compare_metadata(MigrationContext.configure(connection), Base.metadata)
+    assert changes == []

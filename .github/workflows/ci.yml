@@ -40,3 +40,43 @@ jobs:
         run: docker build -f ros2/Dockerfile -t nodeai-ros-test .
       - name: Test real ROS actions and bridge transport
         run: docker run --rm nodeai-ros-test
+
+  missions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: nodeai-test-only
+          POSTGRES_DB: nodeai_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 2s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r services/mission_api/requirements.lock
+      - name: Test PostgreSQL persistence and concurrent claims
+        env:
+          NODEAI_TEST_DATABASE_URL: postgresql+psycopg://postgres:nodeai-test-only@127.0.0.1:5432/nodeai_test
+        run: pytest services/mission_api/tests -q
+      - name: Start the mission and ROS fixture stack
+        env:
+          NODEAI_API_PORT: '18000'
+        run: docker compose -p nodeai-ci --profile demo up -d --build --wait
+      - name: Run a persisted two-waypoint mission
+        run: python services/mission_api/smoke.py --url http://127.0.0.1:18000 --out mission-smoke.json
+      - name: Show service logs
+        if: failure()
+        run: docker compose -p nodeai-ci --profile demo logs --no-color
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mission-smoke
+          path: mission-smoke.json
+      - name: Stop fixture services
+        if: always()
+        run: docker compose -p nodeai-ci --profile demo down -v
