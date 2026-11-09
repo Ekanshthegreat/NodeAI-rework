@@ -21,6 +21,7 @@ from websockets.legacy.server import serve
 from websockets.exceptions import ConnectionClosed
 
 from nodeai_bridge.gateway import Gateway, identifier
+from nodeai_bridge.transport import enqueue
 
 
 class NavigationPort:
@@ -231,27 +232,9 @@ async def socket_server(node):
         )
         try:
             async for raw in socket:
-                try:
-                    data = json.loads(
-                        raw,
-                        parse_constant=lambda value: (_ for _ in ()).throw(
-                            ValueError(value)
-                        ),
-                    )
-                    if isinstance(data, dict):
-                        request_id = identifier(data.get("request_id"))
-                    node.commands.put_nowait(data)
-                except (ValueError, Full):
-                    await socket.send(
-                        json.dumps(
-                            {
-                                "version": 1,
-                                "type": "error",
-                                "request_id": request_id,
-                                "message": "Invalid JSON or command queue full",
-                            }
-                        )
-                    )
+                error = enqueue(raw, node.commands)
+                if error is not None:
+                    await socket.send(json.dumps(error))
         except ConnectionClosed:
             pass
         finally:
