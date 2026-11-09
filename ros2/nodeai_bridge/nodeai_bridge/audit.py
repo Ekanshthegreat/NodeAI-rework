@@ -1,5 +1,6 @@
 """Bounded SQLite event history. This is an audit trail, not action recovery."""
 import argparse
+from contextlib import closing
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -43,7 +44,7 @@ def records(path, after=0, limit=1000, session=None):
     if type(after) is not int or after < 0 or type(limit) is not int or not 1 <= limit <= 10000:
         raise ValueError('Use after >= 0 and limit 1–10,000')
     uri = Path(path).resolve().as_uri() + '?mode=ro'
-    with sqlite3.connect(uri, uri=True, timeout=2) as db:
+    with closing(sqlite3.connect(uri, uri=True, timeout=2)) as db:
         rows = db.execute('SELECT sequence, session, recorded_at, kind, body FROM events '
                           'WHERE sequence > ? AND (? IS NULL OR session = ?) ORDER BY sequence LIMIT ?',
                           (after, session, session, limit))

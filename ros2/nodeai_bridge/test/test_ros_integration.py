@@ -297,7 +297,7 @@ def test_real_cancelled_route_does_not_send_next_goal(bridge):
 
 def test_diagnostics_track_ros_heartbeat_and_processed_commands(bridge):
     node, events, _ = bridge
-    wait_for(lambda: node.last_heartbeat is not None)
+    wait_for(lambda: node.diagnostics().get('ready_robots') == 1)
     diagnostics = node.diagnostics()
     assert 0 <= diagnostics['heartbeat_age_seconds'] < 2
     assert diagnostics['ready_robots'] == 1
@@ -305,3 +305,28 @@ def test_diagnostics_track_ros_heartbeat_and_processed_commands(bridge):
     node.commands.put(request('diagnostics', 1))
     wait_for(lambda: node.diagnostics()['commands_processed'] > before)
     wait_for(lambda: any(e.get('request_id') == 'diagnostics' and e.get('state') == 'succeeded' for e in events))
+
+
+def test_audit_records_a_real_action_from_command_to_terminal_result(bridge, tmp_path):
+    from nodeai_bridge.audit import AuditLog, records
+    node, _, _ = bridge
+    path = tmp_path / 'bridge.sqlite3'
+    audit = AuditLog(path)
+    original_emit, original_gateway_emit = node.emit, node.gateway.emit
+    node.audit = audit
+    node.emit = node.publish_event
+    node.gateway.emit = node.publish_event
+    try:
+        node.commands.put(request('audited-goal', 1))
+        wait_for(lambda: any(row['body'].get('state') == 'succeeded' for row in records(path)))
+        saved = records(path)
+        assert saved[0]['kind'] == 'command'
+        assert saved[0]['body']['request_id'] == 'audited-goal'
+        assert any(row['body'].get('state') == 'pending' for row in saved)
+        assert saved[-1]['body']['state'] == 'succeeded'
+        assert all(row['session'] == audit.session for row in saved)
+        assert node.audit_errors == 0
+    finally:
+        node.audit = None
+        node.emit, node.gateway.emit = original_emit, original_gateway_emit
+        audit.close()
