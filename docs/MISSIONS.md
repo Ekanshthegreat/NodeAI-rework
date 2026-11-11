@@ -18,9 +18,9 @@ persisted two-waypoint mission, checks duplicate submission and waits for its
 real ROS action-fixture result. [Saved local run](../services/mission_api/examples/fixture-run.json).
 The fixture generates poses and battery readings; it uses no robot hardware.
 
-Compose starts PostgreSQL, the API, a worker and the ROS fixture. Without
-`--profile demo`, it starts only PostgreSQL and the API. `docker compose down`
-keeps the named database volume; `down -v` deliberately deletes it.
+Compose starts PostgreSQL, RabbitMQ, the API, a worker and the ROS fixture.
+Without `--profile demo`, Compose starts the database, broker and API.
+`docker compose down` keeps the named database and broker volumes.
 
 Local defaults are `operator-local-development` and `worker-local-development`
 for the two bearer tokens. Change `NODEAI_API_TOKEN`, `NODEAI_WORKER_TOKEN` and
@@ -84,6 +84,22 @@ After checking Nav2/operator evidence, an operator can POST to
 reconciling stale state. This updates the ledger; it does not send a robot command.
 There is no automatic physical action recovery or exactly-once execution claim.
 
+## RabbitMQ wakeups
+
+After a new mission commits, the API sends a wakeup using publisher confirms.
+The queue retains one pending wakeup, since one signal can cover several
+missions. The worker acknowledges it and claims work through the API.
+Every dispatch still uses the PostgreSQL ownership token and lease.
+
+The worker checks PostgreSQL again after five seconds without a wakeup.
+This also covers missed notifications and broker outages. The queue contains
+only wakeups, so a repeated delivery leads to another claim check.
+
+To exercise fallback, run `docker compose stop broker`, run the smoke command
+again, then run `docker compose start broker`. Set `NODEAI_BROKER_PASSWORD` to
+change the local broker password. A standalone API or worker accepts
+`NODEAI_AMQP_URL` to enable wakeups.
+
 ## Work on the service
 
 Set `NODEAI_DATABASE_URL` to a dedicated PostgreSQL database using the
@@ -100,5 +116,5 @@ pytest services/mission_api/tests -q
 
 CI runs the PostgreSQL concurrency/restart checks and the full Compose/ROS smoke
 path. The service currently has a database-backed queue, shared role tokens and
-one local worker. RabbitMQ, OIDC, a React API integration and cloud deployment
+one local worker. OIDC, a React API integration and cloud deployment
 remain later stages.

@@ -13,6 +13,19 @@ services:
       interval: 2s
       timeout: 2s
       retries: 20
+  broker:
+    image: rabbitmq:4-alpine
+    hostname: broker
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, check_running]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    environment:
+      RABBITMQ_DEFAULT_USER: nodeai
+      RABBITMQ_DEFAULT_PASS: ${NODEAI_BROKER_PASSWORD:-nodeai-broker-local}
+    volumes:
+      - broker-data:/var/lib/rabbitmq
   api:
     build:
       context: .
@@ -20,6 +33,7 @@ services:
     environment:
       NODEAI_DATABASE_URL: postgresql+psycopg://nodeai:${NODEAI_DB_PASSWORD:-nodeai-local-only}@db/nodeai
       NODEAI_API_TOKEN: ${NODEAI_API_TOKEN:-operator-local-development}
+      NODEAI_AMQP_URL: amqp://nodeai:${NODEAI_BROKER_PASSWORD:-nodeai-broker-local}@broker:5672/%2F
       NODEAI_WORKER_TOKEN: ${NODEAI_WORKER_TOKEN:-worker-local-development}
     command: [sh, -c, 'alembic upgrade head && uvicorn nodeai_missions.api:application --factory --host 0.0.0.0 --port 8000 --limit-concurrency 100']
     ports:
@@ -44,6 +58,7 @@ services:
       dockerfile: services/mission_api/Dockerfile
     environment:
       NODEAI_API_URL: http://api:8000
+      NODEAI_AMQP_URL: amqp://nodeai:${NODEAI_BROKER_PASSWORD:-nodeai-broker-local}@broker:5672/%2F
       NODEAI_WORKER_TOKEN: ${NODEAI_WORKER_TOKEN:-worker-local-development}
       NODEAI_WORKER_ID: fixture-worker
       NODEAI_BRIDGE_URL: ws://ros-fixture:8765
@@ -56,3 +71,4 @@ services:
         condition: service_started
 volumes:
   mission-data:
+  broker-data:

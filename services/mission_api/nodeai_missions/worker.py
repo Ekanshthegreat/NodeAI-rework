@@ -6,6 +6,7 @@ import time
 import httpx
 from websockets.sync.client import connect
 from websockets.exceptions import WebSocketException
+from .broker import wait_for_work
 
 TERMINAL = {'succeeded', 'cancelled', 'rejected', 'failed'}
 
@@ -96,7 +97,8 @@ def main():
                     os.environ.get('NODEAI_WORKER_ID', 'worker1'), os.environ.get('NODEAI_BRIDGE_URL', 'ws://127.0.0.1:8765'))
                 if result: print(json.dumps({'mission_id': result['id'], 'state': result['state']}), flush=True)
                 if args.once: break
-                time.sleep(1)
+                if result is None:
+                    wait_for_work(os.environ.get('NODEAI_AMQP_URL'))
     except (KeyError, OSError, ValueError, httpx.HTTPError, WebSocketException) as error:
         parser.error(str(error))
 

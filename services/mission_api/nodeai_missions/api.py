@@ -4,11 +4,12 @@ import os
 import secrets
 from typing import Annotated, Literal
 import uuid
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt
 from sqlalchemy.exc import SQLAlchemyError
 from .store import Conflict, Missing, Store
 from .boundary import BoundedJSONBody
+from .broker import notify_worker
 
 ID = Annotated[str, Field(pattern=r'^[A-Za-z0-9_-]{1,64}$')]
 Number = StrictFloat | StrictInt
@@ -51,7 +52,7 @@ class Reconcile(BaseModel):
     reason: Annotated[str, Field(min_length=10, max_length=500)]
 
 
-def create_app(database_url, api_token, worker_token):
+def create_app(database_url, api_token, worker_token, amqp_url=None):
     if not api_token or not worker_token or api_token == worker_token:
         raise ValueError('Configure different, nonempty API and worker tokens')
     store = Store(database_url)
@@ -86,9 +87,11 @@ def create_app(database_url, api_token, worker_token):
         store.ready()
         return {'status': 'ok'}
     @app.post('/missions', dependencies=[operator])
-    def submit(body: NewMission, response: Response, idempotency_key: Annotated[ID, Header()]):
+    def submit(body: NewMission, response: Response, background: BackgroundTasks, idempotency_key: Annotated[ID, Header()]):
         mission, created = store.submit(idempotency_key, body.model_dump(mode='json'))
         response.status_code = 201 if created else 200
+        if created and amqp_url:
+            background.add_task(notify_worker, amqp_url)
         return mission
     @app.get('/missions/{mission_id}', dependencies=[operator])
     def get(mission_id: uuid.UUID): return store.get(mission_id)
@@ -114,4 +117,5 @@ def create_app(database_url, api_token, worker_token):
 
 
 def application():
-    return create_app(os.environ['NODEAI_DATABASE_URL'], os.environ['NODEAI_API_TOKEN'], os.environ['NODEAI_WORKER_TOKEN'])
+    return create_app(os.environ['NODEAI_DATABASE_URL'], os.environ['NODEAI_API_TOKEN'], os.environ['NODEAI_WORKER_TOKEN'],
+                      os.environ.get('NODEAI_AMQP_URL'))

@@ -70,6 +70,10 @@ jobs:
         run: docker compose -p nodeai-ci --profile demo up -d --build --wait
       - name: Run a persisted two-waypoint mission
         run: python services/mission_api/smoke.py --url http://127.0.0.1:18000 --out mission-smoke.json
+      - name: Run a mission during a broker outage
+        run: |
+          docker compose -p nodeai-ci stop broker
+          python services/mission_api/smoke.py --url http://127.0.0.1:18000
       - name: Show service logs
         if: failure()
         run: docker compose -p nodeai-ci --profile demo logs --no-color
