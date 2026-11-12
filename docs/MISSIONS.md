@@ -100,6 +100,19 @@ again, then run `docker compose start broker`. Set `NODEAI_BROKER_PASSWORD` to
 change the local broker password. A standalone API or worker accepts
 `NODEAI_AMQP_URL` to enable wakeups.
 
+## Inspect mission state
+
+`GET /metrics` accepts the operator bearer token and serves Prometheus text
+format. One PostgreSQL query counts missions by state and counts expired
+dispatch leases. A scrape reads the current state without changing it. The
+claim path still moves expired missions to `unknown`, which continues to
+reserve the robot until reconciliation.
+
+```sh
+curl -H 'Authorization: Bearer operator-local-development' \
+  http://127.0.0.1:8000/metrics
+```
+
 ## Work on the service
 
 Set `NODEAI_DATABASE_URL` to a dedicated PostgreSQL database using the

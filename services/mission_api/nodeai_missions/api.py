@@ -86,6 +86,18 @@ def create_app(database_url, api_token, worker_token, amqp_url=None):
     def health():
         store.ready()
         return {'status': 'ok'}
+
+    @app.get('/metrics', dependencies=[operator], response_class=Response)
+    def metrics():
+        counts, expired = store.mission_counts()
+        lines = ['# TYPE nodeai_missions gauge']
+        lines.extend(f'nodeai_missions{{state="{state}"}} {count}' for state, count in counts.items())
+        lines.extend([
+            '# TYPE nodeai_expired_leases gauge',
+            f'nodeai_expired_leases {expired}',
+        ])
+        return Response('\n'.join(lines) + '\n', media_type='text/plain; version=0.0.4')
+
     @app.post('/missions', dependencies=[operator])
     def submit(body: NewMission, response: Response, background: BackgroundTasks, idempotency_key: Annotated[ID, Header()]):
         mission, created = store.submit(idempotency_key, body.model_dump(mode='json'))

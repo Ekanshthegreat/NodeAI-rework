@@ -131,3 +131,26 @@ def test_migration_schema_matches_models(client, app):
     with app.state.store.engine.connect() as connection:
         changes = compare_metadata(MigrationContext.configure(connection), Base.metadata)
     assert changes == []
+
+
+def test_metrics_report_expired_leases_without_changing_mission_state(client, app, operator, worker):
+    assert client.get('/metrics').status_code == 401
+    assert client.get('/metrics', headers=worker).status_code == 401
+    first = submit(client, operator).json()
+    assert claim(client, worker).json()['id'] == first['id']
+    submit(client, operator, 'second')
+    with app.state.store.engine.begin() as connection:
+        connection.execute(update(Mission).where(Mission.id == uuid.UUID(first['id']))
+            .values(lease_until=datetime.now(timezone.utc) - timedelta(seconds=1)))
+
+    response = client.get('/metrics', headers=operator)
+    assert response.status_code == 200
+    assert response.headers['content-type'].startswith('text/plain; version=0.0.4')
+    assert 'nodeai_missions{state="queued"} 1' in response.text
+    assert 'nodeai_missions{state="dispatching"} 1' in response.text
+    assert 'nodeai_missions{state="unknown"} 0' in response.text
+    assert 'nodeai_expired_leases 1' in response.text
+    assert claim(client, worker).status_code == 204
+    response = client.get('/metrics', headers=operator)
+    assert 'nodeai_missions{state="unknown"} 1' in response.text
+    assert 'nodeai_expired_leases 0' in response.text

@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta, timezone
 import uuid
-from sqlalchemy import create_engine, exists, select, text
+from sqlalchemy import create_engine, exists, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased, sessionmaker
 from .models import Mission, MissionEvent
 
-ACTIVE = ('dispatching', 'running', 'unknown')
+LEASED = ('dispatching', 'running')
+ACTIVE = (*LEASED, 'unknown')
 TERMINAL = ('succeeded', 'cancelled', 'rejected', 'failed')
 
 
@@ -42,6 +43,19 @@ class Store:
         with self.engine.connect() as connection:
             connection.execute(text('SELECT id FROM missions LIMIT 0'))
 
+    def mission_counts(self):
+        expired = func.count().filter(
+            Mission.state.in_(LEASED), Mission.lease_until < func.now()
+        )
+        query = select(Mission.state, func.count(), expired).group_by(Mission.state)
+        counts = dict.fromkeys(('queued', *ACTIVE, *TERMINAL), 0)
+        expired_count = 0
+        with self.sessions() as session:
+            for state, count, expired_in_state in session.execute(query):
+                counts[state] = count
+                expired_count += expired_in_state
+        return counts, expired_count
+
     def submit(self, key, payload):
         with self.sessions.begin() as session:
             mission = session.execute(insert(Mission).values(id=uuid.uuid4(), idempotency_key=key,
@@ -75,7 +89,7 @@ class Store:
         now = datetime.now(timezone.utc)
         try:
             with self.sessions.begin() as session:
-                expired = session.scalars(select(Mission).where(Mission.state.in_(('dispatching', 'running')),
+                expired = session.scalars(select(Mission).where(Mission.state.in_(LEASED),
                     Mission.lease_until < now).with_for_update(skip_locked=True)).all()
                 for mission in expired:
                     record(session, mission, 'unknown', 'Worker lease expired; reconcile before dispatching again')
