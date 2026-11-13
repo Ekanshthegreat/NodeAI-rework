@@ -103,13 +103,17 @@ def test_worker_and_operator_roles_and_invalid_payloads(client, operator, worker
 def test_lifecycle_events_are_transactional_and_cursor_paginated(client, operator, worker):
     mission = submit(client, operator).json()
     leased = claim(client, worker).json()
+    other = submit(client, operator, 'other', {**PAYLOAD, 'robot_id': 'agv2'}).json()
     report(client, worker, leased, 'running')
+    other_lease = claim(client, worker, robots=['agv2']).json()
+    assert other_lease['id'] == other['id']
     report(client, worker, leased, 'succeeded')
     endpoint = f"/missions/{mission['id']}/events"
     first = client.get(endpoint+'?limit=2', headers=operator).json()
     rest = client.get(endpoint+f"?after={first[-1]['sequence']}", headers=operator).json()
     assert [row['state'] for row in first+rest] == ['queued', 'dispatching', 'running', 'succeeded']
     assert [row['version'] for row in first+rest] == [1, 2, 3, 4]
+    assert rest[0]['sequence'] > first[-1]['sequence'] + 1
     assert client.get(endpoint+'?limit=1000', headers=operator).status_code == 422
 
 

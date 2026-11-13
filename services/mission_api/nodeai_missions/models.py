@@ -34,8 +34,9 @@ class Mission(Base):
 class MissionEvent(Base):
     __tablename__ = 'mission_events'
     sequence: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    mission_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('missions.id'), index=True)
+    mission_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('missions.id'))
     state: Mapped[str] = mapped_column(String(16))
     version: Mapped[int] = mapped_column(Integer)
     detail: Mapped[str] = mapped_column(Text)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (Index('mission_event_cursor', 'mission_id', 'sequence'),)
