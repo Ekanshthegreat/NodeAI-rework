@@ -9,6 +9,7 @@ from .models import Mission, MissionEvent
 LEASED = ('dispatching', 'running')
 ACTIVE = (*LEASED, 'unknown')
 TERMINAL = ('succeeded', 'cancelled', 'rejected', 'failed')
+LEASE_DURATION = timedelta(seconds=30)
 
 
 class Conflict(Exception):
@@ -86,11 +87,10 @@ class Store:
                          detail=row.detail, recorded_at=row.recorded_at) for row in rows]
 
     def claim(self, worker, robots):
-        now = datetime.now(timezone.utc)
         try:
             with self.sessions.begin() as session:
                 expired = session.scalars(select(Mission).where(Mission.state.in_(LEASED),
-                    Mission.lease_until < now).with_for_update(skip_locked=True)).all()
+                    Mission.lease_until < func.now()).with_for_update(skip_locked=True)).all()
                 for mission in expired:
                     record(session, mission, 'unknown', 'Worker lease expired; reconcile before dispatching again')
                 session.flush()
@@ -100,7 +100,7 @@ class Store:
                     .order_by(Mission.created_at, Mission.id).with_for_update(skip_locked=True).limit(1))
                 if mission is None: return None
                 mission.worker_id, mission.dispatch_token = worker, uuid.uuid4()
-                mission.lease_until = now + timedelta(seconds=30)
+                mission.lease_until = session.scalar(select(func.clock_timestamp())) + LEASE_DURATION
                 record(session, mission, 'dispatching', 'Worker claimed mission')
                 session.flush()
                 return view(mission)
@@ -119,16 +119,18 @@ class Store:
                 if state == mission.state: return view(mission)
                 raise Conflict('Mission is already terminal')
             if mission.state == 'queued': raise Conflict('Mission has not been dispatched')
-            if mission.lease_until < datetime.now(timezone.utc) and mission.state != 'unknown':
+            # Sample the database clock after acquiring the row lock.
+            now = session.scalar(select(func.clock_timestamp()))
+            if mission.lease_until < now and mission.state != 'unknown':
                 record(session, mission, 'unknown', 'Worker lease expired; late evidence requires reconciliation')
             if state is None:
                 # A late heartbeat never revives an uncertain dispatch.
-                if mission.state != 'unknown': mission.lease_until = datetime.now(timezone.utc) + timedelta(seconds=30)
+                if mission.state != 'unknown': mission.lease_until = now + LEASE_DURATION
             elif mission.state == 'unknown' and state not in TERMINAL:
                 if state != 'unknown': raise Conflict('Uncertain dispatch requires terminal evidence')
             else:
                 if state != mission.state: record(session, mission, state, detail)
-                mission.lease_until = datetime.now(timezone.utc) + timedelta(seconds=30)
+                mission.lease_until = now + LEASE_DURATION
             session.flush()
             return view(mission)
 

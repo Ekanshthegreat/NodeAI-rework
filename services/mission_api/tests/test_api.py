@@ -56,6 +56,27 @@ def test_claims_are_exclusive_per_robot_and_worker_token_is_fenced(client, opera
     assert claim(client, worker).status_code == 200
 
 
+def test_leases_use_database_time_even_if_api_clock_is_ahead(client, app, operator, worker, monkeypatch):
+    from sqlalchemy import func, select
+    from nodeai_missions import store
+
+    class FastClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime.now(tz) + timedelta(hours=1)
+
+    monkeypatch.setattr(store, 'datetime', FastClock)
+    submit(client, operator)
+    mission = claim(client, worker).json()
+    assert mission['state'] == 'dispatching'
+    assert report(client, worker, mission, 'running').status_code == 200
+    with app.state.store.engine.begin() as connection:
+        remaining = connection.scalar(select(Mission.lease_until - func.clock_timestamp()))
+    assert timedelta(seconds=20) < remaining <= timedelta(seconds=30)
+    assert claim(client, worker).status_code == 204
+    assert client.get(f"/missions/{mission['id']}", headers=operator).json()['state'] == 'running'
+
+
 def test_expired_worker_holds_robot_until_versioned_reconciliation(client, app, operator, worker):
     submit(client, operator)
     submit(client, operator, 'second')
