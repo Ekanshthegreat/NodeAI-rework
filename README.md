@@ -19,6 +19,11 @@ npm ci
 npm run dev
 ```
 
+The 3D view uses Three.js through React Three Fiber. Select a robot to inspect
+its status, follow it, or switch to the top-down camera. Routes and location labels
+can be toggled independently. The scene draws the same positions and map geometry
+as the 2D view, including the exact restricted-area polygons.
+
 Try `Deliver supplies from Pharmacy to Ward A`. Block the assigned robot after
 pickup to exercise reassignment, then open Replay to inspect the recorded run.
 Commands use a small grammar; unsupported instructions fail before dispatch.

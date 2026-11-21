@@ -30,7 +30,7 @@ export default function DashboardPage() {
     { fleet } = store;
   const [command, setCommand] = useState(example),
     [selected, setSelected] = useState<string | null>(null),
-    [view, setView] = useState<'2d' | '3d'>('2d'),
+    [view, setView] = useState<'2d' | '3d'>('3d'),
     [error, setError] = useState(''),
     [resetOpen, setResetOpen] = useState(false);
   const submit = (text: string) => {
@@ -109,7 +109,13 @@ export default function DashboardPage() {
             <div className="three-view">
               <SceneBoundary>
                 <Suspense fallback={<p className="empty-state">Loading 3D view…</p>}>
-                  <Canvas3D />
+                  <Canvas3D
+                    site={fleet.site}
+                    robots={fleet.robots}
+                    missions={fleet.missions}
+                    selectedRobot={selected}
+                    onSelect={setSelected}
+                  />
                 </Suspense>
               </SceneBoundary>
             </div>
