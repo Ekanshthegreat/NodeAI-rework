@@ -69,7 +69,11 @@ export function Canvas3D({
   const [revision, setRevision] = useState(0);
   const [routes, setRoutes] = useState(true);
   const [labels, setLabels] = useState(true);
+  const [clearance, setClearance] = useState(false);
   const robot = robots.find((r) => r.id === selectedRobot);
+  const cameraView = view === 'follow' && !robot ? 'overview' : view;
+  const waiting = missions.filter((m) => m.status === 'active' && m.traffic?.waitingFor);
+  const selectedMission = waiting.find((m) => m.robotId === selectedRobot);
   return (
     <div className="fleet-scene">
       <div className="scene-toolbar">
@@ -77,7 +81,7 @@ export function Canvas3D({
           {(['overview', 'top', 'follow'] as const).map((mode) => (
             <button
               key={mode}
-              aria-pressed={view === mode}
+              aria-pressed={cameraView === mode}
               disabled={mode === 'follow' && !robot}
               onClick={() => {
                 setView(mode);
@@ -89,6 +93,14 @@ export function Canvas3D({
           ))}
         </div>
         <div className="scene-layers">
+          <label>
+            <input
+              type="checkbox"
+              checked={clearance}
+              onChange={(e) => setClearance(e.target.checked)}
+            />
+            Clearance
+          </label>
           <label>
             <input type="checkbox" checked={routes} onChange={(e) => setRoutes(e.target.checked)} />
             Routes
@@ -131,6 +143,7 @@ export function Canvas3D({
             onSelect={onSelect}
             showRoutes={routes}
             showLabels={labels}
+            showClearance={clearance}
           />
           <Grid
             args={[20, 20]}
@@ -144,14 +157,16 @@ export function Canvas3D({
             fadeDistance={55}
             fadeStrength={1}
           />
-          <CameraRig view={view} robot={robot} revision={revision} />
+          <CameraRig view={cameraView} robot={robot} revision={revision} />
         </Canvas>
       </div>
       <div className="scene-footer">
         <span>
           {robot
-            ? `${robot.id} · ${robot.status.toLowerCase()} · ${Math.round(robot.battery * 100)}% battery`
-            : 'Select a robot to inspect or follow it'}
+            ? `${robot.id} · ${selectedMission ? `yielding to ${selectedMission.traffic?.waitingFor}` : robot.status.toLowerCase()} · ${Math.round(robot.battery * 100)}% battery`
+            : waiting.length
+              ? `${waiting.length} robot${waiting.length === 1 ? '' : 's'} yielding`
+              : 'Select a robot to inspect or follow it'}
         </span>
         <span>Drag to orbit · Scroll to zoom · Right-drag to pan</span>
       </div>

@@ -3,12 +3,15 @@ import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import { Group, MathUtils } from 'three';
 import type { Robot } from '../../types';
+import { ROBOT_RADIUS } from '../../simulation/traffic';
 export default function RobotMesh({
   robot,
   position,
   rotation,
   selected = false,
   showLabel = true,
+  showClearance = false,
+  waitingFor,
   onSelect,
 }: {
   robot: Robot;
@@ -16,6 +19,8 @@ export default function RobotMesh({
   rotation: [number, number, number];
   selected?: boolean;
   showLabel?: boolean;
+  showClearance?: boolean;
+  waitingFor?: string | null;
   onSelect?: (id: string) => void;
 }) {
   const body = useRef<Group>(null);
@@ -29,7 +34,7 @@ export default function RobotMesh({
     body.current.rotation.y += Math.atan2(Math.sin(angle), Math.cos(angle)) * blend;
   });
   const color =
-    robot.status === 'BLOCKED' || robot.status === 'ERROR'
+    robot.status === 'BLOCKED' || robot.status === 'ERROR' || waitingFor
       ? '#a26545'
       : robot.status === 'CHARGING'
         ? '#6b8464'
@@ -68,10 +73,10 @@ export default function RobotMesh({
         <boxGeometry args={[0.02, 0.07, 0.34]} />
         <meshStandardMaterial color="#d9eee9" emissive="#95c1b8" emissiveIntensity={0.6} />
       </mesh>
-      {selected && (
+      {(selected || showClearance || waitingFor) && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.025, 0]}>
-          <ringGeometry args={[0.72, 0.77, 48]} />
-          <meshBasicMaterial color="#245b91" />
+          <ringGeometry args={[ROBOT_RADIUS, ROBOT_RADIUS + 0.04, 48]} />
+          <meshBasicMaterial color={waitingFor ? '#a26545' : selected ? '#245b91' : '#829a97'} />
         </mesh>
       )}
       {showLabel && (
@@ -82,6 +87,7 @@ export default function RobotMesh({
             onClick={() => onSelect?.(robot.id)}
           >
             {robot.id}
+            {waitingFor ? ' · yielding' : ''}
           </button>
         </Html>
       )}

@@ -1,6 +1,7 @@
 import type { Robot, Site } from '../types';
 import { HOSPITAL_ANCHORS } from '../lib/anchors';
 import type { Execution } from '../simulation/engine';
+import { ROBOT_RADIUS } from '../simulation/traffic';
 const x = (n: number) => 40 + (n + 10) * 30,
   y = (n: number) => 40 + (10 - n) * 20;
 const visible = ['Pharmacy', 'Ward A', 'Ward B', 'Storage', 'Loading Dock', 'Charging Station'];
@@ -96,10 +97,11 @@ export default function FleetMap({
           <title>
             {r.id}: {r.status}, battery {Math.round(r.battery * 100)}%
           </title>
-          <circle
+          <ellipse
             cx={x(r.pose.x)}
             cy={y(r.pose.y)}
-            r={selectedRobot === r.id ? 11 : 9}
+            rx={ROBOT_RADIUS * 30 + (selectedRobot === r.id ? 2 : 0)}
+            ry={ROBOT_RADIUS * 20 + (selectedRobot === r.id ? 2 : 0)}
             fill={
               r.status === 'BLOCKED' || r.status === 'ERROR' || r.status === 'CHARGING'
                 ? '#8a5e42'

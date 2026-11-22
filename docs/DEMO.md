@@ -42,8 +42,14 @@ the event history with the original mission. Export the JSON. Refresh and confir
 that runs, robot state and the global pause setting remain. Export before using
 Reset demo if you want to keep a run outside browser storage.
 
-The default 2D map needs no WebGL. Switch to 3D and rotate/zoom the floor schematic;
-then switch back. At a 390-pixel viewport the layout stacks, keeping mission
+The 3D view opens by default. Select a robot, follow it, or use the top-down
+camera. Enable Clearance to see each robot's footprint. The 2D map needs no WebGL.
+
+Use **Send all robots to Ward B** with an idle fleet. All three missions should
+complete at separate stopping positions. Robots yield or reroute when another
+robot occupies their path. The event log and mission cards identify traffic waits.
+A robot stopped in a narrow passage can hold traffic until it moves or the
+waiting mission reaches its two-minute deadline. At a 390-pixel viewport the layout stacks, keeping mission
 controls and replay accessible without horizontal page scrolling.
 
 ## Release verification

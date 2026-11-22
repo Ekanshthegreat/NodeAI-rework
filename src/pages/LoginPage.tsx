@@ -72,8 +72,8 @@ export default function LoginPage() {
             </a>
           </div>
           <p>
-            Local robots are point agents. Hardware task handlers and fleet collision avoidance are
-            outside this release.
+            Local robots yield and reroute around occupied space. ROS navigation uses the connected
+            Nav2 stack.
           </p>
         </footer>
       </div>

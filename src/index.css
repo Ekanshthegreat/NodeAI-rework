@@ -1030,3 +1030,8 @@ p {
     font-size: 10px;
   }
 }
+.traffic-notice {
+  color: #8c582f;
+  font-size: 13px;
+  margin: 8px 0;
+}

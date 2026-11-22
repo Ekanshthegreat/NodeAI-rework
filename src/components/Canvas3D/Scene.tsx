@@ -50,6 +50,7 @@ export default function Scene({
   onSelect,
   showRoutes,
   showLabels,
+  showClearance,
 }: {
   site: Site;
   robots: Robot[];
@@ -58,6 +59,7 @@ export default function Scene({
   onSelect?: (id: string) => void;
   showRoutes: boolean;
   showLabels: boolean;
+  showClearance: boolean;
 }) {
   return (
     <group>
@@ -110,11 +112,16 @@ export default function Scene({
       })}
       {showRoutes &&
         missions
-          .filter((m) => (m.status === 'active' || m.status === 'paused') && m.route.length > 1)
+          .filter(
+            (m) => (m.status === 'active' || m.status === 'paused') && m.waypoint < m.route.length
+          )
           .map((m) => (
             <Line
               key={m.id}
-              points={m.route.map((p) => [p.x, 0.07, p.y])}
+              points={[
+                robots.find((robot) => robot.id === m.robotId)?.pose ?? m.route[0],
+                ...m.route.slice(m.waypoint),
+              ].map((p) => [p.x, 0.07, p.y])}
               color={m.robotId === selectedRobot ? '#245b91' : '#6a8d89'}
               lineWidth={m.robotId === selectedRobot ? 3 : 1.8}
               dashed={m.status === 'paused'}
@@ -128,6 +135,11 @@ export default function Scene({
           rotation={[0, -robot.pose.theta, 0]}
           selected={robot.id === selectedRobot}
           showLabel={showLabels}
+          showClearance={showClearance}
+          waitingFor={
+            missions.find((m) => m.robotId === robot.id && m.status === 'active')?.traffic
+              ?.waitingFor
+          }
           onSelect={onSelect}
         />
       ))}

@@ -121,8 +121,8 @@ export default function DashboardPage() {
             </div>
           )}
           <p className="map-caption">
-            Routes avoid the map’s obstacles and no-go area. Robot-to-robot collision avoidance is
-            outside this MVP.
+            Robots keep clearance from walls and each other. Occupied routes wait or replan; shared
+            destinations use separate stopping positions.
           </p>
         </section>
         <section className="panel dispatch-panel">
@@ -161,6 +161,23 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
+          <button
+            className="secondary-button"
+            disabled={fleet.robots.some(
+              (r) => r.status !== 'IDLE' || r.battery < 0.2 || fleet.faults[r.id]
+            )}
+            onClick={() => {
+              try {
+                for (let i = 0; i < fleet.robots.length; i++) store.submit('Inspect Ward B');
+                setError('');
+                toast.success('Fleet dispatched to separate stopping positions at Ward B');
+              } catch (err) {
+                setError(message(err));
+              }
+            }}
+          >
+            Send all robots to Ward B
+          </button>
           <label className="toggle-row">
             <input
               type="checkbox"
@@ -195,9 +212,24 @@ export default function DashboardPage() {
               <tbody>
                 {fleet.robots.map((r) => (
                   <tr key={r.id}>
-                    <th scope="row">{r.id}</th>
+                    <th scope="row">
+                      <button
+                        className="quiet-button"
+                        aria-pressed={selected === r.id}
+                        onClick={() => setSelected(r.id)}
+                      >
+                        {r.id}
+                      </button>
+                    </th>
                     <td>
-                      <span className="status">{r.status}</span>
+                      <span className="status">
+                        {fleet.missions.some(
+                          (m) =>
+                            m.robotId === r.id && m.status === 'active' && m.traffic?.waitingFor
+                        )
+                          ? 'YIELDING'
+                          : r.status}
+                      </span>
                     </td>
                     <td>{Math.round(r.battery * 100)}%</td>
                     <td>
@@ -264,6 +296,11 @@ export default function DashboardPage() {
                       · {m.retries} reassignments{m.hasCargo ? ' · carrying simulated cargo' : ''}
                     </p>
                     {m.error && <p className="inline-error">{m.error}</p>}
+                    {m.status === 'active' && m.traffic?.waitingFor && (
+                      <p className="traffic-notice" role="status">
+                        Yielding to {m.traffic.waitingFor} · checking for a clear route
+                      </p>
+                    )}
                     {['active', 'paused'].includes(m.status) && (
                       <div className="robot-actions">
                         <button

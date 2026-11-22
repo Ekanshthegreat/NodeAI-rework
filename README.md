@@ -52,7 +52,7 @@ waypoint sequencing and cancellation. The two paths do not share robot state.
 
 | Browser | ROS bridge |
 | --- | --- |
-| Static-grid routes and simulated cargo handoff | Single pose or up to 20 sequential waypoints |
+| Footprint-aware routes, traffic yielding and cargo handoff | Single pose or up to 20 sequential waypoints |
 | Pause, faults and one reassignment attempt | One active goal per robot; hold uncertain outcomes |
 | Saved runs, playback and JSON export | SQLite audit, health checks and queue metrics |
 
@@ -88,8 +88,8 @@ the ROS tests use a test action server.
 
 ## Scope
 
-The simulator uses point robots on a static map; traffic coordination and dynamic
-obstacles are outside it. The ROS bridge is a local integration prototype, with
+The simulator checks robot footprints and traffic at fixed steps on a static map.
+A narrow passage can stay occupied until the blocking robot moves or the mission times out. The ROS bridge is a local integration prototype, with
 no hardware deployment validation. Audit history records observations; it does
 not restore action clients or resume goals after a restart. Older vendor adapters
 under `src/adapters/` are outside the supported simulator/ROS paths.
