@@ -11,7 +11,7 @@ lifecycle. ROS mode delegates route planning to Nav2 rather than local A*.
 flowchart LR
   UI[Command form] --> Parser[Constrained parser + Zod]
   Parser --> Engine[Pure fleet state machine]
-  Planner[A* static map planner] --> Engine
+  Planner[A* with footprint clearance] --> Engine
   Engine --> Store[Zustand fleet store]
   Store --> Map[2D / lazy 3D views]
   Store --> Storage[Validated browser snapshot]
@@ -39,12 +39,22 @@ Assignment chooses an idle, fault-free robot with sufficient battery, sorting
 by battery and then robot ID. This is a deterministic heuristic, not an optimal
 fleet scheduler.
 
-`src/lib/planner_path.ts` searches a four-neighbour grid using A* with Manhattan
-distance. Edge checks reject rectangle and polygon intersections, including
+`src/lib/planner_path.ts` searches a four-neighbour grid using A* with a Euclidean
+distance heuristic and safe connections from each endpoint. Edge checks reject rectangle and polygon intersections, including
 boundary contact. The planner validates endpoint joins and only removes
 collinear waypoints. Unreachable routes throw instead of returning an unsafe
-straight line. Planning treats robots as points and does not account for moving
-robots or corridor capacity.
+straight line. The simulator uses a 0.65 m bounding radius around each robot and requires
+1.35 m between centers. Routes account for walls, restricted polygons and the
+current positions of other robots. Every movement segment is checked again
+before it commits, including other robots' swept segments in the same tick.
+
+A blocked movement waits and retries A* at most once per simulation second.
+Traffic waits are recorded separately from injected faults and do not consume
+the fault-recovery retry. Active missions reserve separate stopping positions
+within 2.3 m of a shared named destination. A cargo handoff stops beside the
+faulted robot. Mission order provides deterministic movement priority. Tight
+corridors can remain blocked until another robot moves or the mission times out;
+this local policy does not guarantee deadlock-free scheduling.
 
 ## Execution and recovery
 
@@ -57,7 +67,7 @@ A blocked robot waits three simulated seconds before recovery. Low battery can
 trigger immediate recovery. Each mission permits one reassignment. A replacement
 must be idle, healthy, sufficiently charged and able to reach the next target.
 If the failed robot already picked up cargo, the replacement first routes to its
-last position and performs a simulated handoff. An unavailable route or exhausted
+last position with footprint clearance and performs a simulated handoff. An unavailable route or exhausted
 budget fails the mission. Recovery disabled leaves the assignment in place until
 an operator clears the fault or the two-minute active-time deadline expires.
 These limits keep the simulation from retrying indefinitely.
@@ -66,12 +76,14 @@ These limits keep the simulation from retrying indefinitely.
 
 `src/simulation/persistence.ts` decodes browser snapshots with bounded Zod
 schemas plus cross-reference checks. It rejects conflicting assignments,
-stale counters, mismatched mission plans, invalid routes and unordered recording
+stale counters, overlapping live robots, mismatched mission plans, invalid routes and unordered recording
 frames. An unreadable snapshot produces a fresh in-memory demo and a visible
 warning; automatic saves leave the unreadable value intact until explicit reset.
 Browser storage is not a server database or a synchronization mechanism.
 
-The engine records every 500 simulation ms and at lifecycle transitions. Recorded
+The engine records every 500 simulation ms and at lifecycle transitions. Completed
+recordings are shared between immutable states; appending a frame or event creates
+a new recording buffer. Recorded
 mission events are stored with their run, independently of the bounded global
 log. `src/simulation/replay.ts` binary-searches the latest frame at or before a
 requested time. Replay displays those snapshots; it does not re-execute the
@@ -100,8 +112,7 @@ hardware integration. Those would require separate implementation and evidence.
 
 ## Next milestones beyond the MVP
 
-Traffic reservations and robot footprint clearance; configurable sites; safer
+Time-based corridor reservations; configurable sites; safer
 vendor integration contracts backed by device fixtures; run import and server
 persistence; and a headless workload benchmark. The optional 3D renderer remains
-a large lazy-loaded bundle. The smaller 2D workspace is the default and remains
-usable if 3D cannot load.
+a large lazy-loaded bundle. The 3D workspace opens by default, with a 2D map available if WebGL cannot load.

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { ROBOT_SEPARATION } from './traffic';
 import {
   createDemoState,
   submitMission,
@@ -96,7 +97,9 @@ describe('bounded fault recovery', () => {
     s = injectFault(s, old.id, 'LOW_BATTERY');
     s = tickFleet(s);
     expect(s.missions[0].phase).toBe('handoff-travel');
-    expect(s.missions[0].route.slice(-1)[0].x).toBeCloseTo(pose.x);
+    const stop = s.missions[0].route.slice(-1)[0];
+    expect(Math.hypot(stop.x - pose.x, stop.y - pose.y)).toBeGreaterThanOrEqual(ROBOT_SEPARATION);
+    expect(Math.hypot(stop.x - pose.x, stop.y - pose.y)).toBeLessThanOrEqual(2.3);
     s = advance(s);
     expect(s.events.some((e) => e.type === 'cargo_handoff')).toBe(true);
     expect(s.missions[0].status).toBe('completed');
@@ -163,4 +166,24 @@ describe('recovery disabled', () => {
     expect(s.missions[0].retries).toBe(0);
     expect(s.recordings.M001.frames.slice(-1)[0]?.status).toBe('failed');
   });
+});
+
+it('preserves earlier replay frames when an active run advances or emits events', () => {
+  const original = submitMission(createDemoState(0), 'Inspect Ward B');
+  const saved = structuredClone(original);
+  const next = advance(original, 20);
+  expect(original).toEqual(saved);
+  expect(next.recordings.M001.frames.length).toBeGreaterThan(
+    original.recordings.M001.frames.length
+  );
+  const paused = setMissionPaused(next, 'M001', true);
+  expect(next.recordings.M001.events.some((e) => e.type === 'mission_paused')).toBe(false);
+  expect(paused.recordings.M001.events.some((e) => e.type === 'mission_paused')).toBe(true);
+});
+
+it('reuses completed recordings while later missions advance', () => {
+  const completed = advance(submitMission(createDemoState(0), 'Go to Pharmacy'), 500);
+  expect(completed.missions[0].status).toBe('completed');
+  const next = tickFleet(submitMission(completed, 'Inspect Ward B'));
+  expect(next.recordings.M001).toBe(completed.recordings.M001);
 });

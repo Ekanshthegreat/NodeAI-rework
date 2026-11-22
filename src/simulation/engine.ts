@@ -2,6 +2,13 @@ import type { Robot, Site, Mission, MissionPlan } from '../types';
 import { compileNLToPlan } from '../lib/planner';
 import { resolveAnchor } from '../lib/anchors';
 import { planPath, type PathPoint } from '../lib/planner_path';
+import {
+  movementBlocker,
+  occupiedRobots,
+  ROBOT_RADIUS,
+  ROBOT_SEPARATION,
+  type Movement,
+} from './traffic';
 
 export type MissionStatus = 'active' | 'paused' | 'completed' | 'failed' | 'cancelled';
 export type Fault = 'BLOCKED' | 'LOW_BATTERY';
@@ -22,6 +29,7 @@ export interface Execution extends Omit<Mission, 'status'> {
   activeMs: number;
   finishedAt: number | null;
   error: string | null;
+  traffic?: { waitingFor: string | null; waitMs: number; reroutes: number };
 }
 export interface SimEvent {
   sequence: number;
@@ -64,7 +72,10 @@ export const MAX_FRAMES = 1800;
 const SPEED = 1.5;
 const TIMEOUT_MS = 120000;
 const terminal = (m: Execution) => ['completed', 'failed', 'cancelled'].includes(m.status);
-const copy = (s: FleetState): FleetState => structuredClone(s);
+const copy = (s: FleetState): FleetState => ({
+  ...structuredClone({ ...s, recordings: {} }),
+  recordings: { ...s.recordings },
+});
 const timestamp = (s: FleetState) => new Date(s.baseTime + s.elapsedMs).toISOString();
 
 export function createDemoState(baseTime = Date.now()): FleetState {
@@ -129,7 +140,13 @@ function emit(
     missionId: m?.id ?? null,
     robotId: robotId ?? m?.robotId ?? null,
   });
-  if (m && s.recordings[m.id]) s.recordings[m.id].events.push(s.events[s.events.length - 1]);
+  if (m && s.recordings[m.id]) {
+    const recording = s.recordings[m.id];
+    s.recordings[m.id] = {
+      ...recording,
+      events: [...recording.events, s.events[s.events.length - 1]].slice(-300),
+    };
+  }
   s.events = s.events.slice(-1000);
 }
 function capture(s: FleetState, m: Execution, force = false): void {
@@ -144,9 +161,10 @@ function capture(s: FleetState, m: Execution, force = false): void {
     robotId: m.robotId,
     robots: structuredClone(s.robots),
   };
-  if (last?.at === frame.at) record.frames[record.frames.length - 1] = frame;
-  else record.frames.push(frame);
-  record.frames = record.frames.slice(-MAX_FRAMES);
+  const frames = record.frames.slice();
+  if (last?.at === frame.at) frames[frames.length - 1] = frame;
+  else frames.push(frame);
+  s.recordings[m.id] = { ...record, frames: frames.slice(-MAX_FRAMES) };
 }
 function routeTo(
   s: FleetState,
@@ -154,14 +172,45 @@ function routeTo(
   robot: Robot,
   target: { x: number; y: number }
 ): void {
-  m.route = planPath({
-    start: robot.pose,
-    goal: target,
-    obstacles: s.site.obstacles,
-    noGo: s.site.noGo,
-  });
+  const reserved = s.missions
+    .filter((other) => other.id !== m.id && !terminal(other))
+    .map((other) => other.route[other.route.length - 1])
+    .filter((p) => p !== undefined);
+  const occupied = [
+    ...s.robots.filter((other) => other.id !== robot.id).map((other) => other.pose),
+    ...reserved,
+  ];
+  const candidates = [
+    target,
+    ...[1.6, 2.3].flatMap((radius) =>
+      Array.from({ length: 8 }, (_, i) => ({
+        x: target.x + Math.cos((i * Math.PI) / 4) * radius,
+        y: target.y + Math.sin((i * Math.PI) / 4) * radius,
+      }))
+    ),
+  ];
+  let route: PathPoint[] | undefined;
+  for (const goal of candidates) {
+    if (occupied.some((p) => Math.hypot(p.x - goal.x, p.y - goal.y) < ROBOT_SEPARATION)) continue;
+    try {
+      route = planPath({
+        start: robot.pose,
+        goal,
+        obstacles: s.site.obstacles,
+        occupied: occupiedRobots(s.robots, robot),
+        noGo: s.site.noGo,
+        clearanceMeters: ROBOT_RADIUS,
+      });
+      break;
+    } catch {
+      /* Try another stopping position at this location. */
+    }
+  }
+  if (!route) throw new Error('No clear stopping position is available at this location');
+  m.route = route;
   m.waypoint = m.route.length > 1 ? 1 : 0;
   m.actionMs = 0;
+  m.traffic = { waitingFor: null, waitMs: 0, reroutes: m.traffic?.reroutes ?? 0 };
 }
 function startStep(s: FleetState, m: Execution, robot: Robot): void {
   const t = m.plan.subtasks[m.step];
@@ -184,6 +233,10 @@ function finish(
   m.status = status;
   m.finishedAt = s.elapsedMs;
   m.error = error;
+  if (m.traffic) {
+    m.traffic.waitingFor = null;
+    m.traffic.waitMs = 0;
+  }
   const robot = s.robots.find((r) => r.id === m.robotId);
   if (robot && !s.faults[robot.id]) robot.status = 'IDLE';
   emit(s, `mission_${status}`, error ?? `Mission ${m.id} ${status}`, m);
@@ -206,7 +259,13 @@ export function submitMission(state: FleetState, text: string): FleetState {
       t.args.to ?? t.args.from ?? t.args.dock ?? t.args.room ?? t.args.zone ?? ''
     );
     if (!target) throw new Error('Unknown mission target');
-    planPath({ start: position, goal: target, obstacles: s.site.obstacles, noGo: s.site.noGo });
+    planPath({
+      start: position,
+      goal: target,
+      obstacles: s.site.obstacles,
+      noGo: s.site.noGo,
+      clearanceMeters: ROBOT_RADIUS,
+    });
     position = { ...position, ...target };
   }
   const m: Execution = {
@@ -273,7 +332,13 @@ export function injectFault(state: FleetState, robotId: string, fault: Fault): F
   robot.status = fault === 'BLOCKED' ? 'BLOCKED' : 'ERROR';
   if (fault === 'LOW_BATTERY') robot.battery = 0.05;
   const mission = s.missions.find((m) => m.robotId === robotId && !terminal(m));
-  if (mission) mission.blockedSince = s.elapsedMs;
+  if (mission) {
+    mission.blockedSince = s.elapsedMs;
+    if (mission.traffic) {
+      mission.traffic.waitingFor = null;
+      mission.traffic.waitMs = 0;
+    }
+  }
   emit(s, 'fault_injected', `${fault} injected on ${robotId}`, mission ?? null, robotId);
   if (mission) capture(s, mission, true);
   return s;
@@ -331,23 +396,64 @@ function recover(s: FleetState, m: Execution, old: Robot): void {
   }
   finish(s, m, 'failed', 'No reachable, idle replacement robot is available');
 }
-function advance(robot: Robot, m: Execution, budget: number): boolean {
+function advance(
+  s: FleetState,
+  robot: Robot,
+  m: Execution,
+  budget: number,
+  movements: Movement[]
+): boolean {
+  const traffic = (m.traffic ??= { waitingFor: null, waitMs: 0, reroutes: 0 });
   while (m.waypoint < m.route.length) {
-    const target = m.route[m.waypoint],
-      dx = target.x - robot.pose.x,
-      dy = target.y - robot.pose.y,
-      distance = Math.hypot(dx, dy);
-    if (distance > budget + 1e-9) {
-      robot.pose = {
-        x: robot.pose.x + (dx / distance) * budget,
-        y: robot.pose.y + (dy / distance) * budget,
-        theta: Math.atan2(dy, dx),
-      };
+    const target = m.route[m.waypoint];
+    const dx = target.x - robot.pose.x,
+      dy = target.y - robot.pose.y;
+    const distance = Math.hypot(dx, dy);
+    const step = Math.min(distance, budget);
+    const next =
+      distance < 1e-9
+        ? { ...robot.pose }
+        : {
+            x: robot.pose.x + (dx / distance) * step,
+            y: robot.pose.y + (dy / distance) * step,
+            theta: Math.atan2(dy, dx),
+          };
+    const blocker = movementBlocker(s.site, robot, robot.pose, next, s.robots, movements);
+    if (blocker) {
+      if (traffic.waitingFor !== blocker)
+        emit(s, 'traffic_wait', `${robot.id} yielding to ${blocker}`, m);
+      traffic.waitingFor = blocker;
+      traffic.waitMs += TICK_MS;
+      // Replan at a bounded rate, treating every other robot as occupied space.
+      if (traffic.waitMs % 1000 === TICK_MS) {
+        try {
+          const route = planPath({
+            start: robot.pose,
+            goal: m.route[m.route.length - 1],
+            obstacles: s.site.obstacles,
+            occupied: occupiedRobots(s.robots, robot),
+            noGo: s.site.noGo,
+            clearanceMeters: ROBOT_RADIUS,
+          });
+          m.route = route;
+          m.waypoint = route.length > 1 ? 1 : 0;
+          traffic.reroutes++;
+          emit(s, 'traffic_rerouted', `${robot.id} planned around occupied space`, m);
+        } catch {
+          /* Keep the position and retry while the destination is occupied. */
+        }
+      }
       return false;
     }
-    robot.pose = { ...target };
-    budget -= distance;
+    if (traffic.waitingFor) emit(s, 'traffic_resumed', `${robot.id} resumed travel`, m);
+    traffic.waitingFor = null;
+    traffic.waitMs = 0;
+    movements.push({ robotId: robot.id, from: { ...robot.pose }, to: next });
+    robot.pose = next;
+    budget -= step;
+    if (distance > step + 1e-9) return false;
     m.waypoint++;
+    if (budget < 1e-9 && m.waypoint < m.route.length) return false;
   }
   return true;
 }
@@ -357,6 +463,7 @@ export function tickFleet(state: FleetState): FleetState {
   if (!state.running) return state;
   const s = copy(state);
   s.elapsedMs += TICK_MS;
+  const movements: Movement[] = [];
   for (const m of s.missions) {
     if (terminal(m)) continue;
     if (m.status === 'paused') {
@@ -373,6 +480,10 @@ export function tickFleet(state: FleetState): FleetState {
       s.faults[robot.id] ??
       (robot.battery < m.plan.constraints.min_battery_pct ? 'LOW_BATTERY' : undefined);
     if (fault) {
+      if (m.traffic) {
+        m.traffic.waitingFor = null;
+        m.traffic.waitMs = 0;
+      }
       if (!s.faults[robot.id]) {
         s.faults[robot.id] = fault;
         robot.status = 'ERROR';
@@ -387,7 +498,7 @@ export function tickFleet(state: FleetState): FleetState {
     }
     if (m.phase === 'travel' || m.phase === 'handoff-travel') {
       robot.battery = Math.max(0, robot.battery - 0.00008);
-      if (advance(robot, m, (SPEED * TICK_MS) / 1000)) {
+      if (advance(s, robot, m, (SPEED * TICK_MS) / 1000, movements)) {
         m.phase = m.phase === 'handoff-travel' ? 'handoff-action' : 'action';
         m.actionMs = 0;
       }

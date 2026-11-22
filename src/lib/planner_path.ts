@@ -21,9 +21,19 @@ export interface PlanPathOptions {
   obstacles?: Obstacle[];
   noGo?: NoGo[];
   resolutionMeters?: number;
+  clearanceMeters?: number;
+  occupied?: Array<Point & { radius: number }>;
   mapBounds?: { minX: number; maxX: number; minY: number; maxY: number };
 }
 
+export function distanceToSegment(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x,
+    dy = b.y - a.y;
+  const squared = dx * dx + dy * dy;
+  const t =
+    squared === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / squared));
+  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
 function onSegment(p: Point, a: Point, b: Point): boolean {
   const cross = (p.y - a.y) * (b.x - a.x) - (p.x - a.x) * (b.y - a.y);
   return (
@@ -45,6 +55,15 @@ function intersects(a: Point, b: Point, c: Point, d: Point): boolean {
     onSegment(b, c, d)
   );
 }
+export function segmentDistance(a: Point, b: Point, c: Point, d: Point): number {
+  if (intersects(a, b, c, d)) return 0;
+  return Math.min(
+    distanceToSegment(a, c, d),
+    distanceToSegment(b, c, d),
+    distanceToSegment(c, a, b),
+    distanceToSegment(d, a, b)
+  );
+}
 function inPolygon(p: Point, poly: Point[]): boolean {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -60,7 +79,8 @@ export function isSegmentClear(
   a: Point,
   b: Point,
   obstacles: Obstacle[] = [],
-  noGo: NoGo[] = []
+  noGo: NoGo[] = [],
+  clearanceMeters = 0
 ): boolean {
   const polygons = [
     ...obstacles.map(({ rect: r }) => [
@@ -75,33 +95,56 @@ export function isSegmentClear(
     (poly) =>
       !inPolygon(a, poly) &&
       !inPolygon(b, poly) &&
-      poly.every((p, i) => !intersects(a, b, p, poly[(i + 1) % poly.length]))
+      poly.every((p, i) => {
+        const q = poly[(i + 1) % poly.length];
+        return (
+          !intersects(a, b, p, q) &&
+          (clearanceMeters === 0 ||
+            Math.min(
+              distanceToSegment(a, p, q),
+              distanceToSegment(b, p, q),
+              distanceToSegment(p, a, b),
+              distanceToSegment(q, a, b)
+            ) >= clearanceMeters)
+        );
+      })
   );
 }
 
-/** Four-neighbour A*: Manhattan heuristic, no corner cutting or unsafe fallback. */
+/** Four-neighbour A* with safe endpoint joins and footprint clearance. */
 export function planPath({
   start,
   goal,
   obstacles = [],
   noGo = [],
   resolutionMeters: r = 0.5,
+  clearanceMeters = 0,
+  occupied = [],
   mapBounds: b = { minX: -10, maxX: 10, minY: -10, maxY: 10 },
 }: PlanPathOptions): PathPoint[] {
   if (
-    ![start.x, start.y, goal.x, goal.y, r, b.minX, b.maxX, b.minY, b.maxY].every(Number.isFinite) ||
+    ![start.x, start.y, goal.x, goal.y, r, clearanceMeters, b.minX, b.maxX, b.minY, b.maxY].every(
+      Number.isFinite
+    ) ||
     r <= 0 ||
+    clearanceMeters < 0 ||
+    occupied.some(
+      (disc) => ![disc.x, disc.y, disc.radius].every(Number.isFinite) || disc.radius < 0
+    ) ||
     b.maxX <= b.minX ||
     b.maxY <= b.minY
   )
     throw new Error('Invalid route coordinates or grid settings');
-  const within = (p: Point) => p.x >= b.minX && p.x <= b.maxX && p.y >= b.minY && p.y <= b.maxY;
+  const within = (p: Point) =>
+    p.x >= b.minX + clearanceMeters &&
+    p.x <= b.maxX - clearanceMeters &&
+    p.y >= b.minY + clearanceMeters &&
+    p.y <= b.maxY - clearanceMeters;
+  const clear = (a: Point, b: Point) =>
+    isSegmentClear(a, b, obstacles, noGo, clearanceMeters) &&
+    occupied.every((disc) => distanceToSegment(disc, a, b) >= disc.radius - 1e-9);
   if (!within(start) || !within(goal)) throw new Error('Route endpoint is outside the map');
-  if (
-    !isSegmentClear(start, start, obstacles, noGo) ||
-    !isSegmentClear(goal, goal, obstacles, noGo)
-  )
-    throw new Error('Route endpoint is blocked');
+  if (!clear(start, start) || !clear(goal, goal)) throw new Error('Route endpoint is blocked');
   const width = Math.floor((b.maxX - b.minX) / r) + 1,
     height = Math.floor((b.maxY - b.minY) / r) + 1;
   if (width * height > 50000) throw new Error('Route grid is too large');
@@ -111,22 +154,39 @@ export function planPath({
   });
   const world = (x: number, y: number) => ({ x: b.minX + x * r, y: b.minY + y * r });
   const key = (x: number, y: number) => `${x},${y}`;
-  const s = cell(start),
-    g = cell(goal);
-  const sw = world(s.x, s.y),
-    gw = world(g.x, g.y);
-  if (!isSegmentClear(start, sw, obstacles, noGo) || !isSegmentClear(gw, goal, obstacles, noGo))
+  // Several safe endpoint connections avoid trapping a robot when its nearest
+  // grid vertex is occupied. Every connecting segment has the same clearance checks.
+  const connections = (point: Point) => {
+    const center = cell(point);
+    const nodes: { x: number; y: number }[] = [];
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++) {
+        const node = { x: center.x + dx, y: center.y + dy };
+        const p = world(node.x, node.y);
+        if (within(p) && clear(point, p)) nodes.push(node);
+      }
+    return nodes;
+  };
+  const starts = connections(start),
+    goals = connections(goal);
+  if (!starts.length || !goals.length)
     throw new Error('Endpoint cannot connect to the routing grid');
+  const goalKeys = new Set(goals.map((p) => key(p.x, p.y)));
   type Node = { x: number; y: number; cost: number; score: number; parent: Node | null };
-  const heuristic = (x: number, y: number) => Math.abs(x - g.x) + Math.abs(y - g.y);
-  const open: Node[] = [{ ...s, cost: 0, score: heuristic(s.x, s.y), parent: null }];
-  const best = new Map<string, number>([[key(s.x, s.y), 0]]);
+  const heuristic = (x: number, y: number) =>
+    Math.hypot(world(x, y).x - goal.x, world(x, y).y - goal.y) / r;
+  const open: Node[] = starts.map((node) => {
+    const p = world(node.x, node.y);
+    const cost = Math.hypot(p.x - start.x, p.y - start.y) / r;
+    return { ...node, cost, score: cost + heuristic(node.x, node.y), parent: null };
+  });
+  const best = new Map<string, number>(open.map((node) => [key(node.x, node.y), node.cost]));
   const closed = new Set<string>();
   while (open.length) {
     open.sort((a, b) => a.score - b.score || a.cost - b.cost);
     const node = open.shift()!;
     if (closed.has(key(node.x, node.y))) continue;
-    if (node.x === g.x && node.y === g.y) {
+    if (goalKeys.has(key(node.x, node.y))) {
       const points: Point[] = [];
       let cursor: Node | null = node;
       while (cursor) {
@@ -160,7 +220,7 @@ export function planPath({
         cost >= (best.get(k) ?? Infinity)
       )
         continue;
-      if (!isSegmentClear(world(node.x, node.y), world(x, y), obstacles, noGo)) continue;
+      if (!within(world(x, y)) || !clear(world(node.x, node.y), world(x, y))) continue;
       best.set(k, cost);
       open.push({ x, y, cost, score: cost + heuristic(x, y), parent: node });
     }

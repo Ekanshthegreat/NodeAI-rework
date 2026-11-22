@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { isSegmentClear } from '../lib/planner_path';
 import { MissionPlan } from '../lib/schemas';
 import { MAX_FRAMES, MAX_RECORDINGS, type FleetState } from './engine';
+import { ROBOT_RADIUS, ROBOT_SEPARATION } from './traffic';
 const number = z.number().finite();
 const nonnegative = number.nonnegative();
 const point = z.object({ x: number, y: number });
@@ -36,6 +37,9 @@ const mission = z.object({
   activeMs: nonnegative,
   finishedAt: nonnegative.nullable(),
   error: z.string().nullable(),
+  traffic: z
+    .object({ waitingFor: z.string().nullable(), waitMs: nonnegative, reroutes: nonnegative.int() })
+    .optional(),
 });
 const frame = z.object({
   at: nonnegative,
@@ -94,6 +98,28 @@ export const STORAGE_KEY = 'nodeai:fleet:v1';
 export function decodeSnapshot(text: string): FleetState {
   if (text.length > 4500000) throw new Error('Saved snapshot is too large');
   const s = schema.parse(JSON.parse(text));
+  if (
+    s.robots.some((robot, i) =>
+      s.robots
+        .slice(i + 1)
+        .some(
+          (other) =>
+            robot.site_id === other.site_id &&
+            Math.hypot(robot.pose.x - other.pose.x, robot.pose.y - other.pose.y) <
+              ROBOT_SEPARATION - 1e-9
+        )
+    )
+  )
+    throw new Error('Saved robots overlap; reset the demo to start with safe separation');
+  if (
+    s.robots.some(
+      (r) =>
+        Math.abs(r.pose.x) > 10 - ROBOT_RADIUS ||
+        Math.abs(r.pose.y) > 10 - ROBOT_RADIUS ||
+        !isSegmentClear(r.pose, r.pose, s.site.obstacles, s.site.noGo, ROBOT_RADIUS)
+    )
+  )
+    throw new Error('Saved robot footprint intersects a wall or restricted area');
   const ids = new Set(s.robots.map((r) => r.id));
   if (
     ids.size !== s.robots.length ||
