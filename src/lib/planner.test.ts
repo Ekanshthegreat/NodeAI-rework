@@ -73,3 +73,44 @@ describe('obstacle-aware routing', () => {
   it('supports a goal on the outer map boundary', () =>
     expect(planPath({ start: { x: 9, y: 0 }, goal: { x: 10, y: 0 } }).slice(-1)[0].x).toBe(10));
 });
+
+it('keeps a stationary off-grid robot at its destination', () => {
+  const point = { x: 1.17, y: -2.13 };
+  expect(planPath({ start: point, goal: point, clearanceMeters: 0.65 })).toEqual([
+    { ...point, theta: 0 },
+  ]);
+});
+
+it('keeps equal-cost route choices deterministic around occupied space', () => {
+  const options = {
+    start: { x: -4, y: 0 },
+    goal: { x: 4, y: 0 },
+    occupied: [{ x: 0, y: 0, radius: 1.35 }],
+    clearanceMeters: 0.65,
+  };
+  const route = planPath(options);
+  expect(planPath(options)).toEqual(route);
+  for (let i = 1; i < route.length; i++) {
+    const a = route[i - 1],
+      b = route[i];
+    expect(
+      isSegmentClear(
+        a,
+        b,
+        [],
+        [
+          {
+            id: 'center',
+            poly: [
+              { x: -0.4, y: -0.4 },
+              { x: 0.4, y: -0.4 },
+              { x: 0.4, y: 0.4 },
+              { x: -0.4, y: 0.4 },
+            ],
+          },
+        ],
+        0.65
+      )
+    ).toBe(true);
+  }
+});

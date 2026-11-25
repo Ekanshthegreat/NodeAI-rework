@@ -145,6 +145,7 @@ export function planPath({
     occupied.every((disc) => distanceToSegment(disc, a, b) >= disc.radius - 1e-9);
   if (!within(start) || !within(goal)) throw new Error('Route endpoint is outside the map');
   if (!clear(start, start) || !clear(goal, goal)) throw new Error('Route endpoint is blocked');
+  if (start.x === goal.x && start.y === goal.y) return [{ ...start, theta: 0 }];
   const width = Math.floor((b.maxX - b.minX) / r) + 1,
     height = Math.floor((b.maxY - b.minY) / r) + 1;
   if (width * height > 50000) throw new Error('Route grid is too large');
@@ -172,19 +173,58 @@ export function planPath({
   if (!starts.length || !goals.length)
     throw new Error('Endpoint cannot connect to the routing grid');
   const goalKeys = new Set(goals.map((p) => key(p.x, p.y)));
-  type Node = { x: number; y: number; cost: number; score: number; parent: Node | null };
+  type Node = {
+    x: number;
+    y: number;
+    cost: number;
+    score: number;
+    parent: Node | null;
+    order: number;
+  };
+  const open: Node[] = [];
+  let nextOrder = 0;
+  const earlier = (a: Node, b: Node) =>
+    a.score < b.score ||
+    (a.score === b.score && (a.cost < b.cost || (a.cost === b.cost && a.order < b.order)));
+  const push = (value: Omit<Node, 'order'>) => {
+    const node = { ...value, order: nextOrder++ };
+    let index = open.length;
+    open.push(node);
+    while (index > 0) {
+      const parent = Math.floor((index - 1) / 2);
+      if (!earlier(node, open[parent])) break;
+      open[index] = open[parent];
+      index = parent;
+    }
+    open[index] = node;
+  };
+  const pop = (): Node => {
+    const first = open[0],
+      last = open.pop()!;
+    if (open.length) {
+      let index = 0;
+      while (index * 2 + 1 < open.length) {
+        let child = index * 2 + 1;
+        if (child + 1 < open.length && earlier(open[child + 1], open[child])) child++;
+        if (!earlier(open[child], last)) break;
+        open[index] = open[child];
+        index = child;
+      }
+      open[index] = last;
+    }
+    return first;
+  };
   const heuristic = (x: number, y: number) =>
     Math.hypot(world(x, y).x - goal.x, world(x, y).y - goal.y) / r;
-  const open: Node[] = starts.map((node) => {
+  starts.forEach((node) => {
     const p = world(node.x, node.y);
     const cost = Math.hypot(p.x - start.x, p.y - start.y) / r;
-    return { ...node, cost, score: cost + heuristic(node.x, node.y), parent: null };
+    push({ ...node, cost, score: cost + heuristic(node.x, node.y), parent: null });
   });
   const best = new Map<string, number>(open.map((node) => [key(node.x, node.y), node.cost]));
   const closed = new Set<string>();
   while (open.length) {
-    open.sort((a, b) => a.score - b.score || a.cost - b.cost);
-    const node = open.shift()!;
+    const node = pop();
     if (closed.has(key(node.x, node.y))) continue;
     if (goalKeys.has(key(node.x, node.y))) {
       const points: Point[] = [];
@@ -222,7 +262,7 @@ export function planPath({
         continue;
       if (!within(world(x, y)) || !clear(world(node.x, node.y), world(x, y))) continue;
       best.set(k, cost);
-      open.push({ x, y, cost, score: cost + heuristic(x, y), parent: node });
+      push({ x, y, cost, score: cost + heuristic(x, y), parent: node });
     }
   }
   throw new Error('No reachable route to the requested location');

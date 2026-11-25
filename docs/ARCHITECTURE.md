@@ -40,7 +40,9 @@ by battery and then robot ID. This is a deterministic heuristic, not an optimal
 fleet scheduler.
 
 `src/lib/planner_path.ts` searches a four-neighbour grid using A* with a Euclidean
-distance heuristic and safe connections from each endpoint. Edge checks reject rectangle and polygon intersections, including
+distance heuristic and safe connections from each endpoint. A binary min-heap
+selects the next candidate in logarithmic time, with insertion order breaking
+equal-cost ties so reroutes remain deterministic. Edge checks reject rectangle and polygon intersections, including
 boundary contact. The planner validates endpoint joins and only removes
 collinear waypoints. Unreachable routes throw instead of returning an unsafe
 straight line. The simulator uses a 0.65 m bounding radius around each robot and requires
