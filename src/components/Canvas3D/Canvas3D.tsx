@@ -22,7 +22,8 @@ function CameraRig({
   const movement = useRef(new Vector3());
   useEffect(() => {
     if (view === 'top') camera.position.set(0, 29, 0.01);
-    else camera.position.set(15, 17, 19);
+    else if (view === 'follow') camera.position.set(5.5, 5.5, 6.5);
+    else camera.position.set(12, 14, 16);
     controls.current?.target.set(0, 0, 0);
     controls.current?.update();
   }, [camera, view, revision]);
@@ -163,7 +164,7 @@ export function Canvas3D({
       <div className="scene-footer">
         <span>
           {robot
-            ? `${robot.id} · ${selectedMission ? `yielding to ${selectedMission.traffic?.waitingFor}` : robot.status.toLowerCase()} · ${Math.round(robot.battery * 100)}% battery`
+            ? `${robot.id} · ${selectedMission ? `yielding to ${selectedMission.traffic?.waitingFor}` : robot.status.toLowerCase()} · ${(robot.speed ?? 0).toFixed(2)} m/s · ${Math.round(robot.battery * 100)}% battery`
             : waiting.length
               ? `${waiting.length} robot${waiting.length === 1 ? '' : 's'} yielding`
               : 'Select a robot to inspect or follow it'}

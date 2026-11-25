@@ -187,3 +187,54 @@ it('reuses completed recordings while later missions advance', () => {
   const next = tickFleet(submitMission(completed, 'Inspect Ward B'));
   expect(next.recordings.M001).toBe(completed.recordings.M001);
 });
+
+it('turns toward the route before moving and bounds each heading change', () => {
+  const initial = createDemoState(0);
+  initial.site.obstacles = [];
+  initial.site.noGo = [];
+  initial.robots[0].pose = { x: -4, y: -4, theta: Math.PI };
+  let state = submitMission(initial, 'Go to Pharmacy');
+  const next = tickFleet(state);
+  expect(next.robots[0].pose.x).toBe(initial.robots[0].pose.x);
+  expect(next.robots[0].pose.y).toBe(initial.robots[0].pose.y);
+  expect(next.robots[0].speed).toBe(0);
+  for (let i = 0; i < 600 && state.missions[0].status === 'active'; i++) {
+    const after = tickFleet(state);
+    const turn = after.robots[0].pose.theta - state.robots[0].pose.theta;
+    expect(Math.abs(Math.atan2(Math.sin(turn), Math.cos(turn)))).toBeLessThanOrEqual(0.2400001);
+    expect(
+      Math.abs((after.robots[0].speed ?? 0) - (state.robots[0].speed ?? 0))
+    ).toBeLessThanOrEqual(0.1200001);
+    state = after;
+  }
+  expect(state.missions[0].status).toBe('completed');
+  expect(state.robots[0].speed).toBe(0);
+});
+
+it('turns to face a clear route, accelerates, and brakes at the destination', () => {
+  const initial = createDemoState(0);
+  initial.site.obstacles = [];
+  initial.site.noGo = [];
+  initial.robots[0].pose = { x: -4, y: -4, theta: Math.PI };
+  let state = submitMission(initial, 'Go to Pharmacy');
+  const turning = tickFleet(state);
+  expect(turning.robots[0].pose.x).toBe(state.robots[0].pose.x);
+  expect(turning.robots[0].pose.y).toBe(state.robots[0].pose.y);
+  let maximumSpeed = 0;
+  for (let i = 0; i < 400 && state.missions[0].status === 'active'; i++) {
+    const next = tickFleet(state);
+    const robot = next.robots[0],
+      previous = state.robots[0];
+    const headingChange = Math.atan2(
+      Math.sin(robot.pose.theta - previous.pose.theta),
+      Math.cos(robot.pose.theta - previous.pose.theta)
+    );
+    expect(Math.abs(headingChange)).toBeLessThanOrEqual(0.24 + 1e-8);
+    expect(Math.abs((robot.speed ?? 0) - (previous.speed ?? 0))).toBeLessThanOrEqual(0.12 + 1e-8);
+    maximumSpeed = Math.max(maximumSpeed, robot.speed ?? 0);
+    state = next;
+  }
+  expect(maximumSpeed).toBe(1.5);
+  expect(state.missions[0].status).toBe('completed');
+  expect(state.robots[0].speed).toBe(0);
+});

@@ -114,3 +114,33 @@ it('keeps equal-cost route choices deterministic around occupied space', () => {
     ).toBe(true);
   }
 });
+
+it('uses one straight segment across an open diagonal', () => {
+  const route = planPath({ start: { x: -4, y: -3 }, goal: { x: 6, y: 7 }, clearanceMeters: 0.65 });
+  expect(route).toHaveLength(2);
+});
+
+it('smooths a wall detour while checking every rounded segment for clearance', () => {
+  const obstacles = [{ id: 'wall', rect: { x: -1, y: -2, w: 2, h: 4 } }];
+  const route = planPath({
+    start: { x: -5, y: 0 },
+    goal: { x: 5, y: 0 },
+    obstacles,
+    clearanceMeters: 0.65,
+  });
+  expect(route.length).toBeGreaterThan(2);
+  for (let i = 1; i < route.length; i++) {
+    expect(isSegmentClear(route[i - 1], route[i], obstacles, [], 0.65)).toBe(true);
+  }
+  const turns = route.slice(1, -1).filter((p, i) => {
+    const a = route[i],
+      b = route[i + 2];
+    const incoming = Math.atan2(p.y - a.y, p.x - a.x);
+    const outgoing = Math.atan2(b.y - p.y, b.x - p.x);
+    return (
+      Math.abs(Math.atan2(Math.sin(outgoing - incoming), Math.cos(outgoing - incoming))) >
+      Math.PI / 3
+    );
+  });
+  expect(turns.length).toBeLessThanOrEqual(2);
+});

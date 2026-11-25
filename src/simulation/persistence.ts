@@ -13,6 +13,7 @@ const robot = z.object({
   vendor: z.enum(['mock', 'ros', 'rmf', 'vda5050']),
   pose,
   battery: number.min(0).max(1),
+  speed: number.min(0).max(1.5).optional(),
   status: z.enum(['IDLE', 'ACTIVE', 'ERROR', 'CHARGING', 'BLOCKED']),
   updated_at: z.string(),
 });

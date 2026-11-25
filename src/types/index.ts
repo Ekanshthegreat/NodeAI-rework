@@ -15,6 +15,7 @@ export interface Robot {
   vendor: 'ros' | 'rmf' | 'vda5050' | 'mock';
   pose: { x: number; y: number; theta: number };
   battery: number;
+  speed?: number;
   status: 'IDLE' | 'ACTIVE' | 'ERROR' | 'CHARGING' | 'BLOCKED';
   updated_at: string;
   capabilities?: string[];

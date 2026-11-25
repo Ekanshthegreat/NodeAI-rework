@@ -146,6 +146,7 @@ export function planPath({
   if (!within(start) || !within(goal)) throw new Error('Route endpoint is outside the map');
   if (!clear(start, start) || !clear(goal, goal)) throw new Error('Route endpoint is blocked');
   if (start.x === goal.x && start.y === goal.y) return [{ ...start, theta: 0 }];
+  if (clear(start, goal)) return addHeadingsToPath([start, goal]);
   const width = Math.floor((b.maxX - b.minX) / r) + 1,
     height = Math.floor((b.maxY - b.minY) / r) + 1;
   if (width * height > 50000) throw new Error('Route grid is too large');
@@ -238,7 +239,7 @@ export function planPath({
       const unique = points.filter(
         (p, i) => i === 0 || p.x !== points[i - 1].x || p.y !== points[i - 1].y
       );
-      return addHeadingsToPath(smoothPath(unique));
+      return addHeadingsToPath(roundCorners(shortcutPath(unique, clear), clear));
     }
     closed.add(key(node.x, node.y));
     for (const [dx, dy] of [
@@ -268,7 +269,61 @@ export function planPath({
   throw new Error('No reachable route to the requested location');
 }
 
-/** Remove only collinear vertices; do not smooth a safe path through obstacles. */
+/** Keep the furthest visible point using the planner's full clearance rules. */
+function shortcutPath(points: Point[], clear: (a: Point, b: Point) => boolean): Point[] {
+  const result = [points[0]];
+  let current = 0;
+  while (current < points.length - 1) {
+    let next = points.length - 1;
+    while (next > current + 1 && !clear(points[current], points[next])) next--;
+    result.push(points[next]);
+    current = next;
+  }
+  return result;
+}
+
+/** Try a gentle corner, retaining the original vertex when clearance is tight. */
+function roundCorners(points: Point[], clear: (a: Point, b: Point) => boolean): Point[] {
+  const result = [points[0]];
+  for (let i = 1; i < points.length - 1; i++) {
+    const previous = points[i - 1],
+      corner = points[i],
+      next = points[i + 1];
+    const incoming = Math.hypot(corner.x - previous.x, corner.y - previous.y);
+    const outgoing = Math.hypot(next.x - corner.x, next.y - corner.y);
+    let accepted = false;
+    for (const scale of [1, 0.5, 0.25]) {
+      const distance = Math.min(1, incoming / 3, outgoing / 3) * scale;
+      const entry = {
+        x: corner.x + ((previous.x - corner.x) / incoming) * distance,
+        y: corner.y + ((previous.y - corner.y) / incoming) * distance,
+      };
+      const exit = {
+        x: corner.x + ((next.x - corner.x) / outgoing) * distance,
+        y: corner.y + ((next.y - corner.y) / outgoing) * distance,
+      };
+      const curve = Array.from({ length: 17 }, (_, sample) => {
+        const t = sample / 16,
+          u = 1 - t;
+        return {
+          x: u * u * entry.x + 2 * u * t * corner.x + t * t * exit.x,
+          y: u * u * entry.y + 2 * u * t * corner.y + t * t * exit.y,
+        };
+      });
+      const segment = [result[result.length - 1], ...curve, next];
+      if (segment.slice(1).every((p, j) => clear(segment[j], p))) {
+        result.push(...curve);
+        accepted = true;
+        break;
+      }
+    }
+    if (!accepted) result.push(corner);
+  }
+  result.push(points[points.length - 1]);
+  return result;
+}
+
+/** Remove collinear points without changing the route geometry. */
 export function smoothPath(points: Point[]): Point[] {
   return points.filter(
     (p, i) => i === 0 || i === points.length - 1 || !onSegment(p, points[i - 1], points[i + 1])

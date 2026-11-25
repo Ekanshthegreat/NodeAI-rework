@@ -70,6 +70,8 @@ export const TICK_MS = 100;
 export const MAX_RECORDINGS = 10;
 export const MAX_FRAMES = 1800;
 const SPEED = 1.5;
+const ACCELERATION = 1.2;
+const TURN_RATE = 2.4;
 const TIMEOUT_MS = 120000;
 const terminal = (m: Execution) => ['completed', 'failed', 'cancelled'].includes(m.status);
 const copy = (s: FleetState): FleetState => ({
@@ -107,6 +109,7 @@ export function createDemoState(baseTime = Date.now()): FleetState {
     pose: { x, y: -6, theta: 0 },
     battery: 0.95 - i * 0.08,
     status: 'IDLE',
+    speed: 0,
     updated_at: new Date(baseTime).toISOString(),
   }));
   return {
@@ -238,7 +241,10 @@ function finish(
     m.traffic.waitMs = 0;
   }
   const robot = s.robots.find((r) => r.id === m.robotId);
-  if (robot && !s.faults[robot.id]) robot.status = 'IDLE';
+  if (robot) {
+    robot.speed = 0;
+    if (!s.faults[robot.id]) robot.status = 'IDLE';
+  }
   emit(s, `mission_${status}`, error ?? `Mission ${m.id} ${status}`, m);
   capture(s, m, true);
 }
@@ -309,6 +315,8 @@ export function setMissionPaused(state: FleetState, id: string, paused: boolean)
     m = s.missions.find((x) => x.id === id);
   if (!m || terminal(m)) return s;
   m.status = paused ? 'paused' : 'active';
+  const robot = s.robots.find((r) => r.id === m.robotId);
+  if (robot && paused) robot.speed = 0;
   emit(
     s,
     paused ? 'mission_paused' : 'mission_resumed',
@@ -329,6 +337,7 @@ export function injectFault(state: FleetState, robotId: string, fault: Fault): F
     robot = s.robots.find((r) => r.id === robotId);
   if (!robot) throw new Error('Unknown robot');
   s.faults[robotId] = fault;
+  robot.speed = 0;
   robot.status = fault === 'BLOCKED' ? 'BLOCKED' : 'ERROR';
   if (fault === 'LOW_BATTERY') robot.battery = 0.05;
   const mission = s.missions.find((m) => m.robotId === robotId && !terminal(m));
@@ -396,20 +405,62 @@ function recover(s: FleetState, m: Execution, old: Robot): void {
   }
   finish(s, m, 'failed', 'No reachable, idle replacement robot is available');
 }
-function advance(
-  s: FleetState,
-  robot: Robot,
-  m: Execution,
-  budget: number,
-  movements: Movement[]
-): boolean {
+function advance(s: FleetState, robot: Robot, m: Execution, movements: Movement[]): boolean {
   const traffic = (m.traffic ??= { waitingFor: null, waitMs: 0, reroutes: 0 });
+  const seconds = TICK_MS / 1000;
+  const remaining = [robot.pose, ...m.route.slice(m.waypoint)];
+  const distanceLeft = remaining
+    .slice(1)
+    .reduce(
+      (sum, point, i) => sum + Math.hypot(point.x - remaining[i].x, point.y - remaining[i].y),
+      0
+    );
+  const brakingSpeed = Math.max(
+    0,
+    Math.sqrt((ACCELERATION * seconds) ** 2 + 2 * ACCELERATION * distanceLeft) -
+      ACCELERATION * seconds
+  );
+  const target = m.route[m.waypoint],
+    following = m.route[m.waypoint + 1];
+  let cruiseSpeed = SPEED;
+  if (target && following) {
+    const approach = Math.atan2(target.y - robot.pose.y, target.x - robot.pose.x);
+    const departure = Math.atan2(following.y - target.y, following.x - target.x);
+    const bend = Math.abs(
+      Math.atan2(Math.sin(departure - approach), Math.cos(departure - approach))
+    );
+    const spacing = Math.hypot(following.x - target.x, following.y - target.y);
+    if (bend > 0.02) cruiseSpeed = Math.min(SPEED, ((TURN_RATE * spacing) / bend) * 0.65);
+  }
+  const previousSpeed = robot.speed ?? 0;
+  robot.speed = Math.max(
+    previousSpeed - ACCELERATION * seconds,
+    Math.min(previousSpeed + ACCELERATION * seconds, brakingSpeed, cruiseSpeed)
+  );
+  let budget = robot.speed * seconds;
+  let turnBudget = TURN_RATE * seconds;
+
   while (m.waypoint < m.route.length) {
     const target = m.route[m.waypoint];
     const dx = target.x - robot.pose.x,
       dy = target.y - robot.pose.y;
     const distance = Math.hypot(dx, dy);
-    const step = Math.min(distance, budget);
+    if (distance < 1e-8) {
+      m.waypoint++;
+      continue;
+    }
+    const desiredHeading = Math.atan2(dy, dx);
+    const turn = Math.atan2(
+      Math.sin(desiredHeading - robot.pose.theta),
+      Math.cos(desiredHeading - robot.pose.theta)
+    );
+    if (Math.abs(turn) > turnBudget + 1e-9) {
+      robot.pose.theta += Math.sign(turn) * turnBudget;
+      robot.speed = 0;
+      return false;
+    }
+    turnBudget -= Math.abs(turn);
+    const step = Math.min(distance, distanceLeft < 0.005 ? distance : budget);
     const next =
       distance < 1e-9
         ? { ...robot.pose }
@@ -420,6 +471,7 @@ function advance(
           };
     const blocker = movementBlocker(s.site, robot, robot.pose, next, s.robots, movements);
     if (blocker) {
+      robot.speed = 0;
       if (traffic.waitingFor !== blocker)
         emit(s, 'traffic_wait', `${robot.id} yielding to ${blocker}`, m);
       traffic.waitingFor = blocker;
@@ -455,6 +507,7 @@ function advance(
     m.waypoint++;
     if (budget < 1e-9 && m.waypoint < m.route.length) return false;
   }
+  robot.speed = 0;
   return true;
 }
 
@@ -480,6 +533,7 @@ export function tickFleet(state: FleetState): FleetState {
       s.faults[robot.id] ??
       (robot.battery < m.plan.constraints.min_battery_pct ? 'LOW_BATTERY' : undefined);
     if (fault) {
+      robot.speed = 0;
       if (m.traffic) {
         m.traffic.waitingFor = null;
         m.traffic.waitMs = 0;
@@ -498,7 +552,7 @@ export function tickFleet(state: FleetState): FleetState {
     }
     if (m.phase === 'travel' || m.phase === 'handoff-travel') {
       robot.battery = Math.max(0, robot.battery - 0.00008);
-      if (advance(s, robot, m, (SPEED * TICK_MS) / 1000, movements)) {
+      if (advance(s, robot, m, movements)) {
         m.phase = m.phase === 'handoff-travel' ? 'handoff-action' : 'action';
         m.actionMs = 0;
       }

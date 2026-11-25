@@ -43,8 +43,9 @@ fleet scheduler.
 distance heuristic and safe connections from each endpoint. A binary min-heap
 selects the next candidate in logarithmic time, with insertion order breaking
 equal-cost ties so reroutes remain deterministic. Edge checks reject rectangle and polygon intersections, including
-boundary contact. The planner validates endpoint joins and only removes
-collinear waypoints. Unreachable routes throw instead of returning an unsafe
+boundary contact. The planner checks every endpoint join, skips grid vertices with clear line of
+sight, and rounds corners only when every resulting segment passes the same
+wall, polygon and robot-clearance checks. Unreachable routes throw instead of returning an unsafe
 straight line. The simulator uses a 0.65 m bounding radius around each robot and requires
 1.35 m between centers. Routes account for walls, restricted polygons and the
 current positions of other robots. Every movement segment is checked again
@@ -60,7 +61,10 @@ this local policy does not guarantee deadlock-free scheduling.
 
 ## Execution and recovery
 
-Navigation consumes route waypoints at a bounded speed. Other verbs travel to
+Navigation follows the clearance-checked route with a 1.5 m/s speed limit,
+1.2 m/s² acceleration/braking target and a 2.4 rad/s heading limit. Robots face
+the next segment before moving when a turn exceeds that tick’s heading budget.
+The 3D wheel rotation follows travelled distance. Other verbs travel to
 their location, then perform a short simulated action. Pickup records cargo;
 delivery clears it. Charging increases battery until the target is reached.
 Completion and cancellation release the robot unless it still has a fault.
